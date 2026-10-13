@@ -25,13 +25,25 @@ Request flow: **routes → controllers → services → repositories → db**
 - What gets logged vs. what gets returned to the client
 - Async error propagation in Express 5
 
-## Configuration
+## Configuration via environment variables
+- All config comes from environment variables (`.env` locally via dotenv; ConfigMap/Secret in Kubernetes)
 - How env vars are loaded and validated at startup
 - Fail-fast behavior for missing/invalid config
-- Per-environment differences (development, test, production)
+- Per-environment differences (development, test, production) expressed only through env vars, not code branches
+- No config files baked into the image
 
-## Logging
-- What to log, at what level, and where
+## Logging to stdout
+- Write logs to stdout/stderr only; let the platform (terminal, kubectl, a log collector) handle storage
+- What to log, at what level
+- Structured (JSON) vs. human-readable output, and whether it differs by environment
+- Request logging and correlation/request IDs
+- Never logging secrets, passwords, or tokens
+
+## Graceful shutdown
+- Handling SIGTERM and SIGINT
+- Shutdown order: mark not-ready, stop accepting new connections, finish in-flight requests, close Socket.IO connections, close the DB pool, exit
+- A timeout that forces exit if shutdown hangs
+- How this fits the Kubernetes termination grace period (see [deployment.md](deployment.md))
 
 ## Real-time integration
 - How HTTP-side services trigger socket emissions without tight coupling
@@ -43,3 +55,5 @@ Request flow: **routes → controllers → services → repositories → db**
 - How will transactions be passed across repository calls?
 - How will services emit real-time events: direct Socket.IO calls, an event emitter, or something else?
 - Do you want dependency injection (passing the db/pool in) to make testing easier?
+- Will you use a logging library or `console`? Which log format?
+- How long should graceful shutdown wait before forcing exit?

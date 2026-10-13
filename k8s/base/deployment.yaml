@@ -1,0 +1,2 @@
+# Deployment for the chirp-service API pods: image, replicas, env from ConfigMap/Secret, liveness and readiness probes, resources.
+# TODO

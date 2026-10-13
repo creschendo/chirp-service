@@ -54,6 +54,27 @@
 - [ ] Real-time message delivery
 - [ ] Tests
 
+## Milestone 7: Deploy to a local Kubernetes cluster
+- [ ] Choose kind or k3d and create a cluster ([deployment.md](deployment.md))
+- [ ] Health module with liveness and readiness checks
+- [ ] Graceful shutdown on SIGTERM
+- [ ] Dockerfile and .dockerignore; build the image and load it into the cluster
+- [ ] Postgres StatefulSet with persistent storage
+- [ ] ConfigMap and Secret for configuration
+- [ ] Migrations run as a Job
+- [ ] API Deployment with probes, plus Service and Ingress
+- [ ] Kustomize base and local overlay apply cleanly
+- [ ] chirp-client can reach the API through the ingress (HTTP and WebSockets)
+
+## Milestone 8: Scale to multiple replicas with Redis for Socket.IO
+- [ ] Run Redis in the cluster
+- [ ] Socket.IO Redis adapter so events reach users on any pod
+- [ ] Decide on sticky sessions vs. WebSocket-only transport
+- [ ] Scale the API to multiple replicas
+- [ ] Readiness checks Redis as well
+- [ ] Verify notifications and DMs work across pods
+- [ ] Verify rolling updates don't drop requests
+
 ## Open questions
 - What is "done" for each milestone: tests passing, contract documented, client integrated?
 - When will you start building chirp-client alongside the API?

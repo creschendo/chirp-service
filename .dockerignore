@@ -1,0 +1,2 @@
+# Files excluded from the Docker build context.
+# TODO: exclude node_modules, .env files, .git, tests, coverage, docs, and k8s manifests.

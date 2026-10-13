@@ -1,0 +1,2 @@
+# StatefulSet (plus storage and Service) for an in-cluster PostgreSQL used in local development.
+# TODO

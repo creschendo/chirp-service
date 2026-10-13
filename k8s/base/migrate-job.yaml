@@ -1,0 +1,2 @@
+# Job that runs database migrations with node-pg-migrate before or alongside a deploy.
+# TODO

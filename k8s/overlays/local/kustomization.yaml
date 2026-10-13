@@ -1,0 +1,2 @@
+# Kustomize overlay for the local cluster (kind or k3d): patches and settings on top of the base.
+# TODO

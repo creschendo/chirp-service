@@ -19,3 +19,7 @@ coverage/
 Thumbs.db
 .vscode/
 .idea/
+
+# Kubernetes secrets (only the example is committed)
+k8s/**/secret.yaml
+k8s/**/*.secret.yaml

@@ -55,9 +55,19 @@ src/
   db/         Postgres connection
   middleware/ shared Express middleware
   realtime/   Socket.IO setup
+  health/     liveness and readiness checks
   modules/    feature modules (routes → controller → service → repository → db)
 tests/        test suites
+k8s/
+  base/       shared Kubernetes manifests (Kustomize base)
+  overlays/
+    local/    local cluster overlay (kind or k3d)
+Dockerfile    container image build
 ```
+
+## Deployment
+
+Practice deployment targets a local Kubernetes cluster. See [`docs/deployment.md`](docs/deployment.md).
 
 ## Feature scope
 
