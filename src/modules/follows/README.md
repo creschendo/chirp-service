@@ -6,7 +6,8 @@
 ## What it needs to handle
 - Follow / unfollow (idempotency, self-follow prevention)
 - Followers and following lists with pagination
-- Relationship checks used by other modules
+- Relationship checks used by other modules (e.g. the "do I follow them" flag on profiles)
+- Routes are mounted under `/users` alongside the users router
 
 ## Interacts with
 - `users`: profile data in lists

@@ -65,7 +65,7 @@ src/
   middleware/ shared Express middleware
   realtime/   Socket.IO setup
   health/     liveness and readiness checks
-  modules/    feature modules (routes → controller → service → repository → db)
+  modules/    feature modules (routes → service → repository → db)
 tests/        test suites
 k8s/
   base/       shared Kubernetes manifests (Kustomize base)

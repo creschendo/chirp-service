@@ -5,10 +5,13 @@
 - How chirp-service relates to chirp-client (separate origins, separate repos)
 
 ## Layers
-Request flow: **routes → controllers → services → repositories → db**
-- **Routes:** what belongs here (path + middleware + controller binding) and what doesn't
-- **Controllers:** translating HTTP to service calls; where validation happens
-- **Services:** business rules, cross-module orchestration, transactions
+Request flow: **routes → services → repositories → db**
+- **Routes:** path + middleware + thin inline handlers (no separate controller layer)
+  - A handler only translates HTTP ↔ service: read validated input, call one service function, map the result to a status code and response
+  - No SQL and no business rules in handlers
+  - Where validation happens (validation middleware vs. inside the handler)
+  - When a module's route file is big enough to justify splitting handlers out
+- **Services:** business rules, cross-module orchestration, transactions; no knowledge of `req`/`res`
 - **Repositories:** SQL access only; how results are shaped before returning
 - **db:** connection pool, transaction helpers
 - Rules for which layers may call which (e.g. can a service call another module's repository?)

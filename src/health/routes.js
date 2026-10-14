@@ -1,2 +1,2 @@
-// HTTP routes for liveness and readiness checks.
+// HTTP routes and thin handlers for liveness and readiness checks.
 // TODO

@@ -4,8 +4,9 @@
 - User profiles: viewing and editing public profile information
 
 ## What it needs to handle
-- Looking up a user by username or ID
-- Editing one's own profile
+- Looking up a user's public profile by username
+- Editing one's own profile (always via `/users/me`)
+- Account deletion (if in scope)
 - Profile-level data shown to others (and what stays private)
 
 ## Interacts with
