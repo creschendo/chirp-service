@@ -7,14 +7,15 @@ Backend API for **Chirp**, a Twitter clone. Built with Node.js (ES modules), Exp
 ## Requirements
 
 - Node.js (LTS)
-- A **local PostgreSQL** instance (required — the API will not run without one)
+- A **local PostgreSQL** instance (required — the API will not run without one). The easiest way is Docker: `compose.yaml` runs Postgres 17 for you.
 
 ## Setup
 
 1. Clone the repo and `cd chirp-service`
 2. Install dependencies: `npm install`
-3. Create a local Postgres database for Chirp
-4. Copy `.env.example` to `.env` and fill in the values
+3. Copy `.env.example` to `.env` and fill in the values (`DATABASE_URL` must match the `POSTGRES_*` values, e.g. `postgres://USER:PASSWORD@localhost:5432/DB`)
+4. Start Postgres in Docker: `npm run db:up`
+   - If a native Postgres is already installed, it may own port 5432 and you'll get `password authentication failed`. Set `POSTGRES_PORT` (and the port in `DATABASE_URL`) to a free port, then run `npm run db:up` again.
 5. Run migrations: `npm run migrate up`
 6. Start the dev server: `npm run dev`
 
@@ -30,6 +31,10 @@ The API runs on **port 4000** by default.
 | `npm run lint` | Lint with ESLint |
 | `npm run format` | Format with Prettier |
 | `npm run migrate` | Run node-pg-migrate (e.g. `npm run migrate up`) |
+| `npm run db:up` | Start Postgres in Docker and wait until it's healthy |
+| `npm run db:down` | Stop Postgres (data is kept in a Docker volume) |
+| `npm run db:reset` | Stop Postgres and **delete all data**, then start fresh |
+| `npm run db:psql` | Open a `psql` shell inside the container |
 
 ## Environment variables
 
@@ -42,6 +47,10 @@ See `.env.example`.
 | `DATABASE_URL` | PostgreSQL connection string |
 | `JWT_SECRET` | Secret used to sign auth tokens |
 | `CLIENT_ORIGIN` | Allowed CORS origin for chirp-client |
+| `POSTGRES_USER` | Postgres user created by the Docker container |
+| `POSTGRES_PASSWORD` | Password for that user |
+| `POSTGRES_DB` | Database created by the Docker container |
+| `POSTGRES_PORT` | Host port for Docker Postgres (defaults to 5432) |
 
 ## Project layout
 

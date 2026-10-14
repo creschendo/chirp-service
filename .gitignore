@@ -23,3 +23,6 @@ Thumbs.db
 # Kubernetes secrets (only the example is committed)
 k8s/**/secret.yaml
 k8s/**/*.secret.yaml
+
+# Personal notes
+docs/data-modeling-guide.md
