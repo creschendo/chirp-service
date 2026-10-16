@@ -4,6 +4,7 @@
 /*
 Mounted at /users alongside the users router (API prefix still to decide in app.js).
 Write routes take a user_id (from the profile response); read routes take a username (what the client URL has).
+Paths have more segments than the users router's /:username, so the two routers don't collide.
 
 PUT /users/me/following/:user_id
   auth:     required
@@ -21,14 +22,14 @@ DELETE /users/me/following/:user_id
             401 not logged in
 
 GET /users/:username/followers
-  auth:     optional
+  auth:     none in v1 (viewer flags such as "you follow them" deferred; would need an optionalAuth middleware)
   params:   username (usernameParamSchema)
   query:    pagination (style still to decide: see docs/timeline.md)
   success:  200 + page of users who follow them
   errors:   404 user not found
 
 GET /users/:username/following
-  auth:     optional
+  auth:     none in v1 (same as followers)
   params:   username (usernameParamSchema)
   query:    pagination
   success:  200 + page of users they follow

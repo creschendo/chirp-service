@@ -28,7 +28,7 @@
 - Locally and (optionally) in CI
 
 ## Open questions
-- Will integration tests hit a real Postgres, or will you mock repositories?
+- Will integration tests hit a real Postgres, or will you mock stores?
 - How will you isolate tests from each other if they run in parallel?
 - Will you aim for a coverage target, or focus on critical paths?
 - How will you test timeline ordering and pagination edge cases?

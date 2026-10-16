@@ -5,16 +5,16 @@
 - How chirp-service relates to chirp-client (separate origins, separate repos)
 
 ## Layers
-Request flow: **routes → services → repositories → db**
+Request flow: **routes → services → stores → db**
 - **Routes:** path + middleware + thin inline handlers (no separate controller layer)
   - A handler only translates HTTP ↔ service: read validated input, call one service function, map the result to a status code and response
   - No SQL and no business rules in handlers
   - Where validation happens (validation middleware vs. inside the handler)
   - When a module's route file is big enough to justify splitting handlers out
 - **Services:** business rules, cross-module orchestration, transactions; no knowledge of `req`/`res`
-- **Repositories:** SQL access only; how results are shaped before returning
+- **Stores:** SQL access only; how results are shaped before returning
 - **db:** connection pool, transaction helpers
-- Rules for which layers may call which (e.g. can a service call another module's repository?)
+- Rules for which layers may call which (e.g. can a service call another module's store?)
 
 ## Module structure
 - What a feature module owns (`src/modules/*`)
@@ -54,8 +54,8 @@ Request flow: **routes → services → repositories → db**
 ## Open questions
 - Will you use custom error classes, or plain errors with status codes attached?
 - Should services know about HTTP at all (status codes), or only domain errors?
-- Will repositories use raw SQL strings, a query builder, or small helpers on top of `pg`?
-- How will transactions be passed across repository calls?
+- Will stores use raw SQL strings, a query builder, or small helpers on top of `pg`?
+- How will transactions be passed across store calls?
 - How will services emit real-time events: direct Socket.IO calls, an event emitter, or something else?
 - Do you want dependency injection (passing the db/pool in) to make testing easier?
 - Will you use a logging library or `console`? Which log format?

@@ -1,9 +1,10 @@
 // PostgreSQL connection pool and query helpers.
 import pg from 'pg';
+import config from '../config/index.js';
 
-// One pool for the whole process; every repository imports this same instance.
+// One pool for the whole process; every store imports this same instance.
 export const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: config.databaseUrl,
 });
 
 // Single statement on any free pooled connection.

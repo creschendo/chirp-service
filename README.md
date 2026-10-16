@@ -27,6 +27,7 @@ The API runs on **port 4000** by default.
 | --- | --- |
 | `npm start` | Run the server |
 | `npm run dev` | Run the server with nodemon (auto-restart) |
+| `npm run dev:all` | Start Postgres, run pending migrations, then `npm run dev` |
 | `npm test` | Run tests with Jest + Supertest |
 | `npm run lint` | Lint with ESLint |
 | `npm run format` | Format with Prettier |
@@ -65,7 +66,7 @@ src/
   middleware/ shared Express middleware
   realtime/   Socket.IO setup
   health/     liveness and readiness checks
-  modules/    feature modules (routes → service → repository → db)
+  modules/    feature modules (routes → service → store → db)
 tests/        test suites
 k8s/
   base/       shared Kubernetes manifests (Kustomize base)

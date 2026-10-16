@@ -33,8 +33,6 @@ POST /auth/logout
   success:  204; sets revoked_at on the current session; clears both cookies
   errors:   none needed; logging out without a valid session can still return 204
 
-GET /auth/me
-  auth:     required
-  success:  200 + current user (what the client loads on startup)
-  errors:   401 not logged in
+The current user ("who am I") is GET /users/me in the users module, not GET /auth/me:
+auth owns sessions and tokens; users owns the users and profiles tables.
 */

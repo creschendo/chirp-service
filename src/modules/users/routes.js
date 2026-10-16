@@ -1,27 +1,61 @@
 // HTTP routes and thin handlers for the users module (validate input, call the service, send the response).
-// TODO
+import { Router } from 'express';
+import * as service from './service.js';
+import { usernameParamSchema } from './schemas.js';
+
+const router = Router();
+
+router.get('/:username', async (req, res) => {
+  const parsed = usernameParamSchema.safeParse(req.params);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid username', issues: parsed.error.issues });
+  }
+
+  const profile = await service.getProfile(parsed.data.username);
+  if (!profile) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  res.json(profile);
+});
+
+export default router;
 
 /*
 Mounted at /users (API prefix such as /api or /api/v1 still to decide in app.js).
-Registration lives in auth; follow/unfollow and follower lists live in follows.
-"me" can't collide with a username: usernames are 3–15 characters.
+Registration and sessions live in auth; follow/unfollow and follower lists live in follows (also mounted at /users).
+Route order: define /me routes before /:username, or "me" is matched as a username
+("me" can't be a real username, usernames are 3–15 characters, so it would fail usernameParamSchema with 400).
+
+v1 routes:
+  GET   /users/me                     this module
+  PATCH /users/me                     this module
+  GET   /users/:username              this module
+  GET   /users/:username/followers    follows module
+  GET   /users/:username/following    follows module
+
+GET /users/me
+  auth:     required
+  success:  200 + current user's account and profile: public profile fields plus email (never the password hash)
+            what the client loads on startup; replaces the previously planned GET /auth/me
+  errors:   401 not logged in
+
+PATCH /users/me
+  auth:     required (editing someone else's profile can't be expressed)
+  body:     editable profile fields: displayName, bio (updateProfileSchema); partial, bio: null clears it
+  success:  200 + updated profile; sets updated_at = now()
+  errors:   400 validation failed (incl. profiles_display_name_length / profiles_bio_length)
+            401 not logged in
 
 GET /users/:username
-  auth:     optional (if logged in, include viewer flags such as whether you follow them)
+  auth:     none in v1 (viewer flags such as "you follow them" deferred; would need an optionalAuth middleware)
   params:   username (usernameParamSchema)
   success:  200 + public profile
   errors:   400 invalid username format
             404 user not found
 
-PATCH /users/me
-  auth:     required (editing someone else's profile can't be expressed)
-  body:     editable profile fields, e.g. display_name, bio (updateProfileSchema)
-  success:  200 + updated profile; sets updated_at = now()
-  errors:   400 validation failed (incl. profiles_display_name_length / profiles_bio_length)
-            401 not logged in
-
-DELETE /users/me   (optional: decide whether account deletion is in scope)
-  auth:     required
-  success:  204; cascades to profile and follows; clears auth cookie
-  errors:   401 not logged in
+Deferred (not in v1):
+  DELETE /users/me                    account deletion; also needs session revocation, cookie clearing, and a decision on posts
+  GET /users?q=                       user search (store.searchUsers already exists)
+  changing username, email, password  username changes: see README open questions; password change belongs with auth
 */
