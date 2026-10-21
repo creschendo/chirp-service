@@ -44,7 +44,7 @@ PATCH /users/me
   auth:     required (editing someone else's profile can't be expressed)
   body:     editable profile fields: displayName, bio (updateProfileSchema); partial, bio: null clears it
   success:  200 + updated profile; sets updated_at = now()
-  errors:   400 validation failed (incl. profiles_display_name_length / profiles_bio_length)
+  errors:   400 validation failed (incl. users_display_name_length / users_bio_length)
             401 not logged in
 
 GET /users/:username

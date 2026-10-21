@@ -9,11 +9,11 @@ Auth option B: two httpOnly cookies.
 
 POST /auth/register
   auth:     none
-  body:     username, email, password (registerSchema)
-  success:  201 + created user/profile (never the password hash); sets auth cookie if sign-up logs you in
+  body:     username, email, password, optional displayName (registerSchema); displayName defaults to the username
+  success:  201 + created user (never the password hash); sets auth cookie if sign-up logs you in
   errors:   400 validation failed
             409 username taken (users_username_key) or email taken (users_email_key)
-  note:     inserts into users AND profiles in one transaction
+  note:     one INSERT into users (account and profile live in the same row)
 
 POST /auth/login
   auth:     none
@@ -34,5 +34,5 @@ POST /auth/logout
   errors:   none needed; logging out without a valid session can still return 204
 
 The current user ("who am I") is GET /users/me in the users module, not GET /auth/me:
-auth owns sessions and tokens; users owns the users and profiles tables.
+auth owns sessions and tokens; users owns the users table.
 */
