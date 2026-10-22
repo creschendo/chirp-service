@@ -1,5 +1,6 @@
 // Migration: users (account, credentials, and public profile in one table) and follows.
-// Decisions: UUID ids, citext for case-insensitive username/email, timestamptz,
+// Decisions: UUID ids, citext for case-insensitive username/email, timestamptz(3) (millisecond precision, so
+// timestamps round-trip exactly through JS Dates and pagination cursors),
 // ON DELETE CASCADE from users, updated_at set by app code.
 
 export const up = (pgm) => {
@@ -7,14 +8,14 @@ export const up = (pgm) => {
     CREATE EXTENSION IF NOT EXISTS citext;
 
     CREATE TABLE users (
-      user_id       uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-      username      citext      NOT NULL,
-      email         citext      NOT NULL,
-      password_hash text        NOT NULL,
-      display_name  text        NOT NULL,
+      user_id       uuid           PRIMARY KEY DEFAULT gen_random_uuid(),
+      username      citext         NOT NULL,
+      email         citext         NOT NULL,
+      password_hash text           NOT NULL,
+      display_name  text           NOT NULL,
       bio           text,
-      created_at    timestamptz NOT NULL DEFAULT now(),
-      updated_at    timestamptz NOT NULL DEFAULT now(),
+      created_at    timestamptz(3) NOT NULL DEFAULT now(),
+      updated_at    timestamptz(3) NOT NULL DEFAULT now(),
       CONSTRAINT users_username_key        UNIQUE (username),
       CONSTRAINT users_email_key           UNIQUE (email),
       CONSTRAINT users_username_format     CHECK (username ~ '^[A-Za-z0-9_]{3,15}$'),
@@ -24,9 +25,9 @@ export const up = (pgm) => {
     );
 
     CREATE TABLE follows (
-      follower_id uuid        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-      followed_id uuid        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
-      created_at  timestamptz NOT NULL DEFAULT now(),
+      follower_id uuid           NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+      followed_id uuid           NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+      created_at  timestamptz(3) NOT NULL DEFAULT now(),
       PRIMARY KEY (follower_id, followed_id),
       CONSTRAINT follows_no_self_follow CHECK (follower_id <> followed_id)
     );
