@@ -17,11 +17,17 @@ export async function withTransaction(fn) {
     await client.query('BEGIN');
     const result = await fn(client);
     await client.query('COMMIT');
+    client.release();
     return result;
   } catch (err) {
-    await client.query('ROLLBACK');
+    try {
+      await client.query('ROLLBACK');
+      client.release();
+    } catch (rollbackErr) {
+      // The connection is broken: release(err) makes the pool discard it instead of reusing it,
+      // and the original error (not the rollback failure) is what the caller sees.
+      client.release(rollbackErr);
+    }
     throw err;
-  } finally {
-    client.release();
   }
 }

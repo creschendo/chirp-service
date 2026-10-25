@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import config from './config/index.js';
+import authRoutes from './modules/auth/routes.js';
 import usersRoutes from './modules/users/routes.js';
 import followsRoutes from './modules/follows/routes.js';
 
@@ -14,6 +15,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Mount each module's router here as it's implemented (unimplemented routes.js files have no default export).
+app.use('/auth', authRoutes);
 app.use('/users', usersRoutes);
 app.use('/users', followsRoutes);
 
