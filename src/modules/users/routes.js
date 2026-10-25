@@ -1,10 +1,39 @@
 // HTTP routes and thin handlers for the users module (validate input, call the service, send the response).
 import { Router } from 'express';
+import { requireAuth } from '../../middleware/auth.js';
 import * as service from './service.js';
-import { usernameParamSchema } from './schemas.js';
+import { usernameParamSchema, updateProfileSchema } from './schemas.js';
 
 const router = Router();
 
+// /me routes come before /:username so "me" isn't treated as a username.
+
+// GET /users/me
+router.get('/me', requireAuth, async (req, res) => {
+  const me = await service.getMe(req.userId);
+  if (!me) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  res.json(me);
+});
+
+// PATCH /users/me
+router.patch('/me', requireAuth, async (req, res) => {
+  const parsed = updateProfileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input', issues: parsed.error.issues });
+  }
+
+  const updated = await service.updateProfile(req.userId, parsed.data);
+  if (!updated) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  res.json(updated);
+});
+
+// GET /users/:username
 router.get('/:username', async (req, res) => {
   const parsed = usernameParamSchema.safeParse(req.params);
   if (!parsed.success) {

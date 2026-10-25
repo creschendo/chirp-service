@@ -4,6 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import config from './config/index.js';
 import usersRoutes from './modules/users/routes.js';
+import followsRoutes from './modules/follows/routes.js';
 
 const app = express();
 
@@ -14,6 +15,7 @@ app.use(cookieParser());
 
 // Mount each module's router here as it's implemented (unimplemented routes.js files have no default export).
 app.use('/users', usersRoutes);
+app.use('/users', followsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
