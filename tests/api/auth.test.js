@@ -118,7 +118,9 @@ describe('POST /auth/refresh', () => {
 
   test('401 and cleared cookies for a revoked session', async () => {
     const { refresh } = await loggedIn();
-    await pool.query('UPDATE sessions SET revoked_at = now() WHERE refresh_token_hash = $1', [hashRefreshToken(refresh)]);
+    await pool.query('UPDATE sessions SET revoked_at = now() WHERE refresh_token_hash = $1', [
+      hashRefreshToken(refresh),
+    ]);
     const res = await refreshWith(refresh);
     expect(res.status).toBe(401);
     expectClearedCookies(res);
@@ -206,7 +208,7 @@ describe('POST /auth/logout', () => {
     expect((await request(app).get('/users/me').set('Cookie', `access_token=${access}`)).status).toBe(200);
   });
 
-  test('a spent (rotated) token revokes all of the user\'s sessions', async () => {
+  test("a spent (rotated) token revokes all of the user's sessions", async () => {
     const user = await createUserWithPassword();
     const { refresh } = await loggedIn(user);
     const other = await loggedIn(user);
@@ -259,7 +261,9 @@ describe('POST /auth/register', () => {
   });
 
   test('uses displayName when given (trimmed)', async () => {
-    const res = await request(app).post('/auth/register').send(body({ displayName: '  New User  ' }));
+    const res = await request(app)
+      .post('/auth/register')
+      .send(body({ displayName: '  New User  ' }));
     expect(res.body.displayName).toBe('New User');
   });
 

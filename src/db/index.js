@@ -7,6 +7,13 @@ export const pool = new pg.Pool({
   connectionString: config.databaseUrl,
 });
 
+// An idle connection can drop (database restart, network blip). pg reports that as an 'error' event on the
+// pool, and an 'error' event with no listener crashes the process. The pool discards the broken connection
+// and opens a new one on the next query, so logging is enough.
+pool.on('error', (err) => {
+  console.error('Idle Postgres connection error', err);
+});
+
 // Single statement on any free pooled connection.
 export const query = (text, params) => pool.query(text, params);
 
