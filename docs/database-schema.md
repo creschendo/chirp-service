@@ -3,6 +3,24 @@
 > Outline only. You'll define tables and columns yourself as you design each milestone.
 > Work through [data-modeling-guide.md](data-modeling-guide.md) first and record your decisions here.
 
+## Decisions
+
+### Posts (migration 003)
+
+- **Replies are posts.** One `posts` table for originals, replies and quote posts. A reply has `parent_post_id`
+  (the post it answers) and `root_post_id` (the conversation's original). Replies can be liked, reposted and
+  quoted like any post.
+- **Nesting is unlimited.** `root_post_id` makes "everything in this conversation" one indexed lookup; the
+  service sets it on insert (the parent's root, or the parent itself if it's an original).
+- **Quote posts** are posts with `quoted_post_id`, and need their own content.
+- **Reposts get their own table** (engagement milestone): a user → post relationship with a time, primary key
+  `(user_id, post_id)`. The home timeline merges posts and reposts.
+- **Deleting a post is a soft delete:** `deleted_at` is set and `content` cleared, so replies and quotes still
+  point at a row and can show "This post was deleted". Replying to or quoting a deleted post is refused.
+- **Content:** 1–280 characters for every live post.
+- **Account deletion** (deferred) will need to soft-delete the user's posts; hard-deleting a user whose posts
+  others replied to or quoted fails on the foreign keys.
+
 ## Current modeling scope
 
 - Users / accounts (credentials vs. public profile data)

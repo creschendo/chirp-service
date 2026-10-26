@@ -6,6 +6,7 @@ import config from './config/index.js';
 import authRoutes from './modules/auth/routes.js';
 import usersRoutes from './modules/users/routes.js';
 import followsRoutes from './modules/follows/routes.js';
+import postsRoutes from './modules/posts/routes.js';
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use(cookieParser());
 app.use('/auth', authRoutes);
 app.use('/users', usersRoutes);
 app.use('/users', followsRoutes);
+app.use('/posts', postsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
