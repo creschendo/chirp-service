@@ -4,6 +4,7 @@
 import { Router } from 'express';
 import config from '../../config/index.js';
 import { ACCESS_TOKEN_COOKIE } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
 import * as service from './service.js';
 import { loginSchema, registerSchema } from './schemas.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from './tokens.js';
@@ -29,26 +30,16 @@ function clearAuthCookies(res) {
 
 // POST /auth/register { username, email, password, displayName? } -> 201 + user, logged in (sets cookies).
 // 400 invalid input, 409 username or email taken (ignoring case).
-router.post('/register', async (req, res) => {
-  const parsed = registerSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', issues: parsed.error.issues });
-  }
-
-  const { user, ...tokens } = await service.register(parsed.data);
+router.post('/register', validate({ body: registerSchema }), async (req, res) => {
+  const { user, ...tokens } = await service.register(req.valid.body);
   setAuthCookies(res, tokens);
   res.status(201).json(user);
 });
 
 // POST /auth/login { login (username or email), password } -> 200 + user, sets cookies, new session.
 // 400 invalid input, 401 invalid credentials (same message for unknown login and wrong password).
-router.post('/login', async (req, res) => {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', issues: parsed.error.issues });
-  }
-
-  const { user, ...tokens } = await service.login(parsed.data);
+router.post('/login', validate({ body: loginSchema }), async (req, res) => {
+  const { user, ...tokens } = await service.login(req.valid.body);
   setAuthCookies(res, tokens);
   res.json(user);
 });

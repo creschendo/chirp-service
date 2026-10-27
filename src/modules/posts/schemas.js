@@ -15,9 +15,12 @@ export const createPostSchema = z
   });
 
 // /posts/:post_id routes.
-export const postIdParamSchema = z.object({
-  post_id: z.uuid('Invalid post id'),
-});
+// .describe() sets the 400 message validate() sends when this fails.
+export const postIdParamSchema = z
+  .object({
+    post_id: z.uuid('Invalid post id'),
+  })
+  .describe('Invalid post id');
 
 // GET /posts/:post_id/replies: ?limit=&cursor=. The cursor holds the last reply's sort keys (oldest first).
 export const repliesQuerySchema = pageQuerySchema(

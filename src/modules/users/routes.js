@@ -3,6 +3,7 @@
 // Deferred: DELETE /users/me, user search (GET /users?q=), changing username/email/password.
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth.js';
+import { validate } from '../../middleware/validate.js';
 import * as service from './service.js';
 import { usernameParamSchema, updateProfileSchema } from './schemas.js';
 
@@ -22,13 +23,8 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // PATCH /users/me (auth) { displayName?, bio? } -> 200 + updated account. Partial; bio: null clears it.
 // 400 invalid, empty or unknown fields; 401 not logged in.
-router.patch('/me', requireAuth, async (req, res) => {
-  const parsed = updateProfileSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', issues: parsed.error.issues });
-  }
-
-  const updated = await service.updateProfile(req.userId, parsed.data);
+router.patch('/me', requireAuth, validate({ body: updateProfileSchema }), async (req, res) => {
+  const updated = await service.updateProfile(req.userId, req.valid.body);
   if (!updated) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -37,13 +33,8 @@ router.patch('/me', requireAuth, async (req, res) => {
 });
 
 // GET /users/:username (public) -> 200 + public profile. 400 invalid username, 404 not found.
-router.get('/:username', async (req, res) => {
-  const parsed = usernameParamSchema.safeParse(req.params);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid username', issues: parsed.error.issues });
-  }
-
-  const profile = await service.getProfile(parsed.data.username);
+router.get('/:username', validate({ params: usernameParamSchema }), async (req, res) => {
+  const profile = await service.getProfile(req.valid.params.username);
   if (!profile) {
     return res.status(404).json({ error: 'User not found' });
   }

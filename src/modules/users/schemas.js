@@ -5,9 +5,12 @@ import { z } from 'zod';
 export const usernameSchema = z.string().regex(/^[A-Za-z0-9_]{3,15}$/, 'Invalid username'); // users_username_format
 export const displayNameSchema = z.string().trim().min(1).max(50); // users_display_name_length
 
-export const usernameParamSchema = z.object({
-  username: usernameSchema,
-});
+// .describe() sets the 400 message validate() sends when this fails.
+export const usernameParamSchema = z
+  .object({
+    username: usernameSchema,
+  })
+  .describe('Invalid username');
 
 // PATCH /users/me. Partial: send only the fields to change; bio: null clears it.
 // Limits match users_display_name_length / users_bio_length. Unknown keys (e.g. email, username) are rejected.
