@@ -2,43 +2,43 @@
 
 ## Milestone 1: Auth
 
-- [ ] Install dependencies; configure ESLint and Prettier
-- [ ] Config loading, database connection, first migration runs
-- [ ] Server boots on port 4000 with central error handling
-- [ ] Design auth flow and token/cookie strategy ([auth.md](auth.md))
-- [ ] Sign up
-- [ ] Log in
-- [ ] Log out
-- [ ] Auth middleware protecting routes
-- [ ] CORS configured for chirp-client
-- [ ] Tests for auth flows
+- [x] Install dependencies; configure ESLint and Prettier
+- [x] Config loading, database connection, first migration runs
+- [x] Server boots on port 4000 with central error handling
+- [x] Design auth flow and token/cookie strategy ([auth.md](auth.md))
+- [x] Sign up
+- [x] Log in
+- [x] Log out
+- [x] Auth middleware protecting routes
+- [x] CORS configured for chirp-client
+- [x] Tests for auth flows
 
 ## Milestone 2: Posts + profiles
 
-- [ ] Design user/profile and post data
-- [ ] View a profile
-- [ ] Edit own profile
-- [ ] Create a post
-- [ ] Delete own post
-- [ ] View a single post
-- [ ] Tests
+- [x] Design user/profile and post data
+- [x] View a profile
+- [x] Edit own profile
+- [x] Create a post
+- [x] Delete own post
+- [x] View a single post
+- [x] Tests
 
 ## Milestone 3: Follows + timeline
 
-- [ ] Decide fan-out strategy and pagination ([timeline.md](timeline.md))
-- [ ] Follow / unfollow
-- [ ] Followers / following lists
+- [x] Decide fan-out strategy and pagination ([timeline.md](timeline.md))
+- [x] Follow / unfollow
+- [x] Followers / following lists
 - [ ] Profile timeline
 - [ ] Home timeline
-- [ ] Pagination
+- [x] Pagination
 - [ ] Tests
 
 ## Milestone 4: Engagement
 
-- [ ] Decide repost vs quote post modeling
+- [x] Decide repost vs quote post modeling
 - [ ] Likes
 - [ ] Reposts
-- [ ] Quote posts
+- [x] Quote posts
 - [ ] Replies and thread view
 - [ ] Bookmarks
 - [ ] Engagement counts and viewer flags in timelines
@@ -64,7 +64,7 @@
 
 - [ ] Choose kind or k3d and create a cluster ([deployment.md](deployment.md))
 - [ ] Health module with liveness and readiness checks
-- [ ] Graceful shutdown on SIGTERM
+- [x] Graceful shutdown on SIGTERM
 - [ ] Dockerfile and .dockerignore; build the image and load it into the cluster
 - [ ] Postgres StatefulSet with persistent storage
 - [ ] ConfigMap and Secret for configuration
