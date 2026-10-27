@@ -28,10 +28,10 @@
 - [x] Decide fan-out strategy and pagination ([timeline.md](timeline.md))
 - [x] Follow / unfollow
 - [x] Followers / following lists
-- [ ] Profile timeline
-- [ ] Home timeline
+- [x] Profile timeline
+- [x] Home timeline
 - [x] Pagination
-- [ ] Tests
+- [x] Tests
 
 ## Milestone 4: Engagement
 
