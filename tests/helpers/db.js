@@ -1,5 +1,5 @@
 // Database helpers for tests.
-import { pool } from '../../src/db/index.js';
+import { pool, truncateAllTables } from '../../src/db/index.js';
 
 // Store tests: every test runs inside a transaction that is rolled back afterwards, so tests never see
 // each other's data and nothing is left behind. Call once per file, at the top level; pass ctx.db to store
@@ -35,14 +35,8 @@ export async function pgErrorCode(db, fn) {
 
 // API tests: requests go through the app's pool, so their data is committed. Empty every table
 // (except the migrations table) between tests instead.
-export async function resetDatabase() {
-  const { rows } = await pool.query(
-    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'pgmigrations'`,
-  );
-  if (rows.length > 0) {
-    const tables = rows.map((r) => `"${r.tablename}"`).join(', ');
-    await pool.query(`TRUNCATE ${tables} RESTART IDENTITY CASCADE`);
-  }
+export function resetDatabase() {
+  return truncateAllTables();
 }
 
 export { pool };

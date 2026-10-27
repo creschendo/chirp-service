@@ -23,19 +23,21 @@ The API runs on **port 4000** by default.
 
 ## Scripts
 
-| Script             | Purpose                                                    |
-| ------------------ | ---------------------------------------------------------- |
-| `npm start`        | Run the server                                             |
-| `npm run dev`      | Run the server with nodemon (auto-restart)                 |
-| `npm run dev:all`  | Start Postgres, run pending migrations, then `npm run dev` |
-| `npm test`         | Run tests with Jest + Supertest                            |
-| `npm run lint`     | Lint with ESLint                                           |
-| `npm run format`   | Format with Prettier                                       |
-| `npm run migrate`  | Run node-pg-migrate (e.g. `npm run migrate up`)            |
-| `npm run db:up`    | Start Postgres in Docker and wait until it's healthy       |
-| `npm run db:down`  | Stop Postgres (data is kept in a Docker volume)            |
-| `npm run db:reset` | Stop Postgres and **delete all data**, then start fresh    |
-| `npm run db:psql`  | Open a `psql` shell inside the container                   |
+| Script             | Purpose                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------- |
+| `npm start`        | Run the server                                                                     |
+| `npm run dev`      | Run the server with nodemon (auto-restart)                                         |
+| `npm run dev:all`  | Start Postgres, run pending migrations, then `npm run dev`                         |
+| `npm test`         | Run tests with Jest + Supertest                                                    |
+| `npm run lint`     | Lint with ESLint                                                                   |
+| `npm run format`   | Format with Prettier                                                               |
+| `npm run migrate`  | Run node-pg-migrate (e.g. `npm run migrate up`)                                    |
+| `npm run db:up`    | Start Postgres in Docker and wait until it's healthy                               |
+| `npm run db:down`  | Stop Postgres (data is kept in a Docker volume)                                    |
+| `npm run db:reset` | Stop Postgres and **delete all data**, then start fresh                            |
+| `npm run db:clear` | Empty every table (keeps the schema and migrations); much faster than `db:reset`   |
+| `npm run db:seed`  | Replace all data with a repeatable fake dataset; log in as `alice` / `password123` |
+| `npm run db:psql`  | Open a `psql` shell inside the container                                           |
 
 ## Environment variables
 
