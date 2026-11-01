@@ -30,7 +30,7 @@
 //   visibleFrom = joinedAt, limit + 1, toPage with { createdAt, messageId }.
 //
 // sendMessage(userId, conversationId, content)
-//   POST /conversations/:id/messages. In withTransaction: getMembership FOR SHARE (null -> 404), createMessage,
+//   POST /conversations/:id/messages. In withTransaction: getMembership with lock (null -> 404), createMessage,
 //   touchConversation(created_at), markRead for the sender at created_at. After commit: emit message:new with the
 //   message view to every other participant's user room. Returns the message view.
 //
@@ -44,15 +44,19 @@
 //   Later: emit conversation:read to the user's own room so their other tabs clear the badge.
 //
 // addMembers(userId, conversationId, userIds)
-//   POST /conversations/:id/participants. Any member can add. Not a member -> 404, direct chat -> 400, current
-//   count + new ids over MAX_GROUP_SIZE -> 400. In one transaction: addParticipants (new members' joined_at =
-//   now(), so earlier history stays hidden from them) and touchConversation. Already-members are ignored.
+//   POST /conversations/:id/participants. Any member can add. In one transaction: getMembership with lock (not a
+//   member -> 404, direct chat -> 400), lockConversation so concurrent adds can't both pass the cap,
+//   addParticipants (new members' joined_at = now(), so earlier history stays hidden from them), then
+//   countParticipants over MAX_GROUP_SIZE -> 400, which rolls the add back. Checking after the insert means
+//   already-members, which addParticipants skips, don't count against the request. Then touchConversation.
 //   Returns the updated participant list. Later: emit conversation:new to the added users, and
 //   conversation:updated to the existing members.
 //
 // leaveConversation(userId, conversationId)
-//   DELETE /conversations/:id/participants/me. Not a member -> 404, direct chat -> 400. In one transaction:
-//   removeParticipant; if countParticipants is now 0, deleteConversation. Rejoining later (being re-added) gets a
+//   DELETE /conversations/:id/participants/me. In one transaction: getMembership with lock (not a member -> 404,
+//   direct chat -> 400), lockConversation so the last two members leaving at once can't both see the other still
+//   there and leave an empty group behind, removeParticipant; if countParticipants is now 0, deleteConversation.
+//   Rejoining later (being re-added) gets a
 //   new joined_at, so messages from before then are hidden again.
 //
 // renameGroup(userId, conversationId, name)
