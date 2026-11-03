@@ -109,8 +109,8 @@ export async function renameGroup(conversationId, name, db = pool) {
 
 // --- Participants ---
 
-// The access check behind every per-conversation route. Returns { conversationId, kind, name, joinedAt, lastReadAt },
-// or null if the conversation doesn't exist OR the user isn't in it (the service 404s for both, so existence isn't
+// The access check behind every per-conversation route. Returns { conversationId, kind, name, createdAt, joinedAt,
+// lastReadAt }, or null if the conversation doesn't exist OR the user isn't in it (the service 404s for both, so existence isn't
 // leaked). A malformed id throws 22P02, so routes validate ids first.
 // lock: true holds the user's participant row until the transaction ends, so a concurrent leave can't slip in before
 // the work that depends on the check; pass a transaction client with it. NO KEY UPDATE rather than SHARE because
@@ -121,6 +121,7 @@ export async function getMembership(conversationId, userId, { lock = false } = {
     `SELECT c.conversation_id AS "conversationId",
             c.kind,
             c.name,
+            c.created_at      AS "createdAt",
             p.joined_at       AS "joinedAt",
             p.last_read_at    AS "lastReadAt"
      FROM conversation_participants p
@@ -155,7 +156,8 @@ export async function listParticipants(conversationId, db = pool) {
 // /conversations/:conversation_id/participants. joined_at and last_read_at both default to now(), so history from
 // before now stays hidden and nothing starts out unread. Existing members and repeated ids are skipped, so their
 // joined_at doesn't change. Returns the ids actually added, in no particular order. No access or cap checks: the
-// service does those first. Errors: 23503 unknown user or conversation (-> 404).
+// service does those, the cap check after this insert in the same transaction. Errors: 23503 unknown user or
+// conversation (-> 404).
 export async function addParticipants(conversationId, userIds, db = pool) {
   const { rows } = await db.query(
     `INSERT INTO conversation_participants (conversation_id, user_id)

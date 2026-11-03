@@ -702,6 +702,7 @@ describe('getMembership', () => {
       conversationId,
       kind: 'group',
       name: null,
+      createdAt: expect.any(Date),
       joinedAt: new Date('2026-01-01T00:00:00Z'),
       lastReadAt: new Date('2026-01-01T00:00:00Z'),
     });

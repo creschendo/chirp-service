@@ -5,7 +5,7 @@
 // createConversationSchema: POST /conversations. strictObject {
 //   userIds: array of z.uuid('Invalid user id'), 1 to MAX_GROUP_SIZE - 1 (the creator isn't listed),
 //   name: optional, trimmed, 1–50 (conversations_name_length)
-// }. Self, duplicates and "name on a direct chat" are checked in the service.
+// }. Duplicates are removed in the service; yourself in the list and "name on a direct chat" are rejected there.
 //
 // conversationIdParamSchema: /conversations/:conversation_id routes. z.uuid, .describe('Invalid conversation id').
 //
