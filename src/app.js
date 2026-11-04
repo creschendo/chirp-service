@@ -8,6 +8,7 @@ import usersRoutes from './modules/users/routes.js';
 import followsRoutes from './modules/follows/routes.js';
 import postsRoutes from './modules/posts/routes.js';
 import timelineRoutes from './modules/timeline/routes.js';
+import messagesRoutes from './modules/messages/routes.js';
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use('/auth', authRoutes);
 app.use('/users', usersRoutes);
 app.use('/users', followsRoutes);
 app.use('/posts', postsRoutes);
+app.use('/conversations', messagesRoutes);
 // Mounted at /: serves /timeline and /users/:username/posts.
 app.use('/', timelineRoutes);
 

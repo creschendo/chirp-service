@@ -26,8 +26,24 @@ Migration `004_create-conversations-messages.js`:
 - Real-time delivery to the other participants
 - Only participants can see a conversation (others get 404)
 
-The planned functions and routes are written as comments in `store.js`, `service.js`, `schemas.js` and
-`routes.js`.
+Routes are mounted at `/conversations`; each route's comment in `routes.js` lists its responses. Real-time
+delivery isn't wired up yet: each service function notes the emit it will make once `src/realtime/` exists.
+
+## Files
+
+- `routes.js`: the ten `/conversations` routes
+- `service.js`: `createConversation`, `getConversation`, `listConversations`, `listMessages`, `sendMessage`,
+  `deleteMessage`, `markRead`, `addMembers`, `leaveConversation`, `renameGroup`
+- `store.js`: conversations, participants, messages, the inbox and read state, plus `lockConversation` for
+  membership changes
+- `schemas.js`: request bodies, path params and page queries, plus `MAX_GROUP_SIZE`
+
+## Tests
+
+- `tests/store/messages.test.js`: store, including constraints, the inbox query and cursor tie-breaks
+- `tests/service/messages.test.js`: service rules, including concurrent sends, leaves and adds
+- `tests/schemas/messages.test.js`: validation schemas
+- `tests/api/messages.test.js`: every route over HTTP
 
 ## Interacts with
 

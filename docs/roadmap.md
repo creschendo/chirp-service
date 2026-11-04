@@ -54,11 +54,12 @@
 
 ## Milestone 6: DMs
 
-- [ ] Design conversations and messages
-- [ ] Start or open a one-to-one conversation
-- [ ] Send and list messages
-- [ ] Real-time message delivery
-- [ ] Tests
+- [x] Design conversations and messages
+- [x] Start or open a one-to-one conversation
+- [x] Group conversations: create, add members, leave, rename
+- [x] Send and list messages
+- [ ] Real-time message delivery (needs the real-time layer from milestone 5)
+- [x] Tests
 
 ## Milestone 7: Deploy to a local Kubernetes cluster
 

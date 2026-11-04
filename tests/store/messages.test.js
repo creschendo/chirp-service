@@ -1,5 +1,6 @@
 // Messages store: direct and group messages (milestone 6). Each test runs in a rolled-back transaction (see
-// helpers/db.js). Turn the remaining todos into tests as the store is built.
+// helpers/db.js). "Last one out deletes the group" spans several store calls, so it's tested in the service and API
+// tests.
 import * as store from '../../src/modules/messages/store.js';
 import { useTransaction, pgErrorCode } from '../helpers/db.js';
 import { createUser } from '../helpers/factories.js';
@@ -122,8 +123,6 @@ describe('findOrCreateDirect', () => {
 });
 
 describe('group conversations', () => {
-  test.todo('remove participant; the last one out deletes the conversation');
-
   // renameGroup never writes to a direct chat, so these go straight to the table to reach the constraints.
   test('a name on a direct conversation is rejected by a constraint', async () => {
     const direct = await insertDirect(alice.userId, bob.userId);
@@ -754,9 +753,7 @@ describe('softDeleteMessage', () => {
     const messageId = await insertMessage(conversationId, alice.userId);
     expect(await store.softDeleteMessage(messageId, alice.userId, ctx.db)).toBe(true);
 
-    const { rows } = await ctx.db.query('SELECT content, deleted_at FROM messages WHERE message_id = $1', [
-      messageId,
-    ]);
+    const { rows } = await ctx.db.query('SELECT content, deleted_at FROM messages WHERE message_id = $1', [messageId]);
     expect(rows[0]).toEqual({ content: null, deleted_at: expect.any(Date) });
   });
 
