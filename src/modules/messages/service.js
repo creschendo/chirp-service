@@ -6,9 +6,7 @@ import * as store from './store.js';
 import { withTransaction } from '../../db/index.js';
 import { badRequest, forbidden, notFound } from '../../errors.js';
 import { toPage } from '../../pagination.js';
-
-// Most members a group can have, counting its creator.
-const MAX_GROUP_SIZE = 20;
+import { MAX_GROUP_SIZE } from './schemas.js';
 
 // Deferred: editing messages, group roles (owner/admin, who may add or remove others), removing other members,
 // DM notifications, typing indicators and read receipts shown to others.
