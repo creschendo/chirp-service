@@ -4,6 +4,7 @@ import app from '../../src/app.js';
 import { pool, resetDatabase } from '../helpers/db.js';
 import { createUser } from '../helpers/factories.js';
 import { authCookie } from '../helpers/auth.js';
+import { addRepost } from '../../src/modules/engagement/store.js';
 
 afterEach(() => resetDatabase());
 afterAll(() => pool.end());
@@ -73,7 +74,30 @@ describe('GET /timeline', () => {
       createdAt: expect.any(String),
       deleted: false,
       quotedPost: null,
+      repost: null,
     });
+  });
+
+  // Reposting has no route yet, so the repost goes in through the engagement store.
+  test('a repost by someone you follow is an item with repost details', async () => {
+    await followAs(alice, bob);
+    const carolsPost = await postAs(carol, 30);
+    const { repostId } = await addRepost(bob.userId, carolsPost);
+
+    const res = await home(alice);
+
+    expect(res.status).toBe(200);
+    expect(res.body.items).toEqual([
+      expect.objectContaining({
+        postId: carolsPost,
+        author: expect.objectContaining({ username: 'carol' }),
+        repost: {
+          repostId,
+          user: { userId: bob.userId, username: 'bob', displayName: bob.displayName },
+          repostedAt: expect.any(String),
+        },
+      }),
+    ]);
   });
 
   test('following and unfollowing through the API take effect on the next request', async () => {

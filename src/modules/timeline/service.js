@@ -3,9 +3,10 @@
 // with one query; nothing is copied into per-user timeline tables, so follows, unfollows and deletes take effect
 // immediately. Revisit (fan-out on write or a cache) only if the home query gets slow.
 //
-// Rules for v1 (decided): originals and quote posts only (replies stay in their conversations), your own posts in
-// your home timeline, deleted posts hidden, newest first. Later (engagement): reposts merged in at repost time,
-// each post shown once even if several followed users reposted it.
+// Rules (decided): originals and quote posts (replies stay in their conversations), your own posts in your home
+// timeline, deleted posts hidden, newest first. Reposts are new activity: a separate item at the time of the repost,
+// with the original left where it was. In the home timeline, a post reposted by several people you follow shows
+// once, as the newest of those reposts. See the store for the queries.
 import * as store from './store.js';
 import * as usersStore from '../users/store.js';
 import { toPage } from '../../pagination.js';
@@ -27,6 +28,9 @@ export async function getProfileTimeline(username, { limit, cursor = null }) {
   return toPage(rows, limit, nextCursor);
 }
 
-// The next page continues after the last item's sort keys. One extra row was fetched only so toPage knows whether
-// there is a next page.
-const nextCursor = (last) => ({ createdAt: last.createdAt.toISOString(), postId: last.postId });
+// The next page continues after the last item's sort keys: a repost's time and id, or a plain post's. One extra row
+// was fetched only so toPage knows whether there is a next page.
+const nextCursor = (last) =>
+  last.repost
+    ? { activityAt: last.repost.repostedAt.toISOString(), itemId: last.repost.repostId }
+    : { activityAt: last.createdAt.toISOString(), itemId: last.postId };

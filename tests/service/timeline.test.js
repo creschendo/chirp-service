@@ -4,6 +4,7 @@
 import * as service from '../../src/modules/timeline/service.js';
 import * as postsStore from '../../src/modules/posts/store.js';
 import { follow } from '../../src/modules/follows/store.js';
+import { addRepost } from '../../src/modules/engagement/store.js';
 import { decodeCursor } from '../../src/pagination.js';
 import { pool, resetDatabase } from '../helpers/db.js';
 import { createUser } from '../helpers/factories.js';
@@ -74,6 +75,25 @@ describe('getHomeTimeline', () => {
 
   test('nothing to show -> empty page', async () => {
     expect(await service.getHomeTimeline(alice.userId, { limit: 10 })).toEqual({ items: [], nextCursor: null });
+  });
+
+  test("a page ending on a repost continues from the repost's time and id", async () => {
+    await follow(alice.userId, bob.userId);
+    const older = await postAt(bob, 30);
+    const { repostId } = await addRepost(bob.userId, older);
+    await pool.query(`UPDATE reposts SET created_at = now() - interval '5 minutes' WHERE repost_id = $1`, [repostId]);
+    const newer = await postAt(alice, 1);
+
+    const first = await service.getHomeTimeline(alice.userId, { limit: 2 });
+    const second = await service.getHomeTimeline(alice.userId, { limit: 2, cursor: decodeCursor(first.nextCursor) });
+
+    expect(first.items.map((item) => item.repost?.repostId ?? item.postId)).toEqual([newer, repostId]);
+    expect(decodeCursor(first.nextCursor)).toEqual({
+      activityAt: first.items[1].repost.repostedAt.toISOString(),
+      itemId: repostId,
+    });
+    expect(ids(second)).toEqual([older]);
+    expect(second.items[0].repost).toBeNull();
   });
 });
 

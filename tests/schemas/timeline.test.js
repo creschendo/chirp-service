@@ -10,7 +10,7 @@ describe('timelineQuerySchema', () => {
   });
 
   test('decodes a cursor made from the last item', () => {
-    const cursor = { createdAt: '2026-10-26T10:05:00.000Z', postId: ID };
+    const cursor = { activityAt: '2026-10-26T10:05:00.000Z', itemId: ID };
     expect(timelineQuerySchema.parse({ limit: '5', cursor: encodeCursor(cursor) })).toEqual({ limit: 5, cursor });
   });
 
@@ -20,10 +20,14 @@ describe('timelineQuerySchema', () => {
     ['non-numeric limit', { limit: 'abc' }],
     ['garbage cursor', { cursor: 'not-a-cursor' }],
     [
-      'cursor with a malformed post id',
-      { cursor: encodeCursor({ createdAt: '2026-10-26T10:05:00.000Z', postId: 'x' }) },
+      'cursor with a malformed item id',
+      { cursor: encodeCursor({ activityAt: '2026-10-26T10:05:00.000Z', itemId: 'x' }) },
     ],
-    ['cursor with a malformed time', { cursor: encodeCursor({ createdAt: 'yesterday', postId: ID }) }],
+    ['cursor with a malformed time', { cursor: encodeCursor({ activityAt: 'yesterday', itemId: ID }) }],
+    [
+      'an old-style { createdAt, postId } cursor',
+      { cursor: encodeCursor({ createdAt: '2026-10-26T10:05:00.000Z', postId: ID }) },
+    ],
     ['a followers cursor', { cursor: encodeCursor({ followedAt: '2026-10-26T10:05:00.000Z', userId: ID }) }],
   ])('rejects %s', (_, query) => {
     expect(timelineQuerySchema.safeParse(query).success).toBe(false);
