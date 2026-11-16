@@ -57,13 +57,11 @@ responses (see the plan below).
 
 `withEngagement(viewerId, posts)` is built and tested but nothing calls it yet. Wiring it in:
 
-**1. Optional-auth middleware** (`middleware/auth.js`, next to `requireAuth`)
+**1. Optional-auth middleware** (done: `optionalAuth` in `middleware/auth.js`, tested in `tests/middleware/auth.test.js`)
 
 - A valid token sets `req.userId`; no token sets `req.userId = null` and continues (no 401).
-- An expired or forged token is treated as logged out, not a 401: a public page shouldn't break over a stale cookie,
-  and the client's refresh flow deals with expiry. (Open: confirm this, since it changes what the client sees when a
-  cookie expires.)
-- Tests for all three cases.
+- An expired, malformed or forged token is treated as logged out, not a 401 (decided): a public page should still
+  load with a stale cookie, and the client's refresh flow deals with expiry.
 
 **2. Call `withEngagement` in the service, after `toPage`**, so only returned items get counts:
 
