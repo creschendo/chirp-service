@@ -22,14 +22,13 @@ import { toPage } from '../../pagination.js';
 
 // Adds engagement: { likeCount, repostCount, replyCount, quoteCount, liked, reposted, bookmarked } to each post view
 // (or timeline item) in the list, for viewerId, and returns the new list in the same order. One store query for the
-// whole list, however long. Exported for the posts and timeline services; the lists below will use it too.
+// whole list, however long. Used by the posts and timeline services and by the lists below.
 // - A deleted post gets engagement: null: there's nothing to show, and its leftover likes and reposts stay hidden.
 // - A repost item shows the original post's numbers (its postId is the original's), so a post looks the same
 //   wherever it appears, and a post on the page twice is fetched once.
 // - The embedded quotedPost gets no counts; the client only shows them on the main post.
-// - viewerId null (logged out) gives real counts with every flag false. Public routes will need an optional-auth
-//   middleware (sets req.userId when a valid token is present, and doesn't 401 otherwise) to pass a viewer; it
-//   doesn't exist yet.
+// - viewerId null (logged out) gives real counts with every flag false. Public routes use optionalAuth, which sets
+//   req.userId from a valid token and null otherwise.
 export async function withEngagement(viewerId, posts) {
   const liveIds = posts.filter((post) => !post.deleted).map((post) => post.postId);
   const engagement = await store.getEngagement(liveIds, viewerId);
@@ -95,26 +94,26 @@ export async function unbookmark(userId, postId) {
 }
 
 // GET /users/:username/likes. A page of the posts that user liked, newest like first: { items, nextCursor } (see
-// src/pagination.js), each item a post view with likedAt. Deleted posts are left out. Returns null if the user
-// doesn't exist (the route 404s); without the lookup, an unknown user and one with no likes would both be an empty
-// page. Public: anyone can see anyone's likes.
-// Not wired up yet: withEngagement on the items, which needs the viewer's id as a new argument (whoever is looking,
-// not the user whose likes these are).
-export async function listLikes(username, { limit, cursor = null }) {
+// src/pagination.js), each item a post view with likedAt and engagement for viewerId: whoever is looking (null when
+// logged out), not the user whose likes these are. Deleted posts are left out. Returns null if the user doesn't exist
+// (the route 404s); without the lookup, an unknown user and one with no likes would both be an empty page. Public:
+// anyone can see anyone's likes.
+export async function listLikes(viewerId, username, { limit, cursor = null }) {
   const user = await usersStore.getProfileByUsername(username);
   if (!user) {
     return null;
   }
   // One extra row only tells toPage whether another page exists.
   const rows = await store.listLikedPosts(user.userId, { limit: limit + 1, cursor });
-  return toPage(rows, limit, (last) => ({ likedAt: last.likedAt.toISOString(), postId: last.postId }));
+  const page = toPage(rows, limit, (last) => ({ likedAt: last.likedAt.toISOString(), postId: last.postId }));
+  return { ...page, items: await withEngagement(viewerId, page.items) };
 }
 
 // GET /users/me/bookmarks. A page of the caller's own bookmarks, newest bookmark first: { items, nextCursor }, each
-// item a post view with bookmarkedAt. Deleted posts are left out. Private: it takes the caller's id from the token, so
-// there's no way to ask for anyone else's.
-// Not wired up yet: withEngagement(userId, items), the caller being the viewer.
+// item a post view with bookmarkedAt and engagement for the caller (so bookmarked is always true). Deleted posts are
+// left out. Private: it takes the caller's id from the token, so there's no way to ask for anyone else's.
 export async function listBookmarks(userId, { limit, cursor = null }) {
   const rows = await store.listBookmarkedPosts(userId, { limit: limit + 1, cursor });
-  return toPage(rows, limit, (last) => ({ bookmarkedAt: last.bookmarkedAt.toISOString(), postId: last.postId }));
+  const page = toPage(rows, limit, (last) => ({ bookmarkedAt: last.bookmarkedAt.toISOString(), postId: last.postId }));
+  return { ...page, items: await withEngagement(userId, page.items) };
 }

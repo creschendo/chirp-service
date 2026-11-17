@@ -282,7 +282,7 @@ describe('listLikes', () => {
   test("{ items, nextCursor } with that user's liked posts, newest like first", async () => {
     const expected = await engagedPosts(service.like, 'likes', alice, 2);
 
-    const page = await service.listLikes(alice.username, { limit: 10 });
+    const page = await service.listLikes(null, alice.username, { limit: 10 });
 
     expect(page.items.map((item) => item.postId)).toEqual(expected);
     expect(page.items[0]).toMatchObject({ author: { userId: bob.userId }, likedAt: expect.any(Date) });
@@ -291,19 +291,23 @@ describe('listLikes', () => {
 
   test('finds the user ignoring case', async () => {
     await service.like(alice.userId, postId);
-    expect((await service.listLikes(alice.username.toUpperCase(), { limit: 10 })).items).toHaveLength(1);
+    expect((await service.listLikes(null, alice.username.toUpperCase(), { limit: 10 })).items).toHaveLength(1);
   });
 
   test('pages through everything with nextCursor', async () => {
     const expected = await engagedPosts(service.like, 'likes', alice, 5);
-    const { seen, pages } = await pageThrough(service.listLikes, alice.username, 2);
+    const { seen, pages } = await pageThrough(
+      (username, query) => service.listLikes(null, username, query),
+      alice.username,
+      2,
+    );
     expect(seen).toEqual(expected);
     expect(pages).toBe(3);
   });
 
   test('a user with no likes -> empty page; an unknown user -> null', async () => {
-    expect(await service.listLikes(bob.username, { limit: 10 })).toEqual({ items: [], nextCursor: null });
-    expect(await service.listLikes('nobody_here', { limit: 10 })).toBeNull();
+    expect(await service.listLikes(null, bob.username, { limit: 10 })).toEqual({ items: [], nextCursor: null });
+    expect(await service.listLikes(null, 'nobody_here', { limit: 10 })).toBeNull();
   });
 });
 

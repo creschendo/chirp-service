@@ -78,7 +78,8 @@ only `2 x limit` rows are sorted.
   other stores)
 - `follows`: the home query reads the `follows` table
 - `users`: `getProfileByUsername` to resolve profile usernames; author fields come through the post view joins
-- `engagement`: the store reads its `reposts` table; counts and viewer flags (`withEngagement`) aren't built yet
+- `engagement`: the store reads its `reposts` table; the service adds `engagement` to every item with
+  `withEngagement` (a repost item gets the original post's numbers). The profile route uses `optionalAuth`.
 
 ## Tests
 
@@ -90,8 +91,6 @@ only `2 x limit` rows are sorted.
 
 ## Open questions / not built yet
 
-- **Counts and viewer flags** per item (likes, reposts, "you liked this"): added in `POST_VIEW_SELECT` / `toPostView`,
-  so every endpoint gets them
 - **A profile "Replies" tab**, and replies between people you follow in the home timeline
 - **"New posts since"** for pull-to-refresh
 - **Performance:** check the home query with `EXPLAIN ANALYZE` for viewers following thousands of accounts

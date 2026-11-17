@@ -35,7 +35,7 @@ A profile's posts (`GET /users/:username/posts`) belong to the `timeline` module
 - **Nesting is unlimited.** A reply to a reply gets the parent's root, so a whole conversation shares one
   `root_post_id`: "everything in this thread" is one indexed lookup.
 - **Quotes** start their own conversation and can quote anything live, including replies and other quotes.
-- **Reposts** will be a separate `reposts` table in the `engagement` module (a relationship, not content).
+- **Reposts** are a separate `reposts` table in the `engagement` module (a relationship, not content).
 
 Decisions are recorded in [docs/database-schema.md](../../../docs/database-schema.md).
 
@@ -98,7 +98,8 @@ Decisions are recorded in [docs/database-schema.md](../../../docs/database-schem
 
 - `users`: post views join `users` read-only for author fields
 - `timeline`: profile and home timelines will reuse `POST_VIEW_SELECT` (not built yet)
-- `engagement`: counts, "did I like this" flags and reposts (not built yet)
+- `engagement`: `withEngagement` adds `engagement` (counts and the viewer's flags; null for a deleted post) to every
+  post view these routes return. `GET /posts/:post_id` and its replies use `optionalAuth` for the viewer.
 - `notifications`: reply and quote notifications to the other post's author (not built yet)
 
 ## Tests

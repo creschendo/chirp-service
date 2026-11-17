@@ -104,13 +104,13 @@ describe('createPost', () => {
 describe('getPost', () => {
   test('returns the same view createPost returned', async () => {
     const created = await service.createPost(author.userId, { content: 'hello' });
-    expect(await service.getPost(created.postId)).toEqual(created);
+    expect(await service.getPost(null, created.postId)).toEqual(created);
   });
 
   test('a deleted post is returned as deleted, not null', async () => {
     const created = await service.createPost(author.userId, { content: 'hello' });
     await softDelete(created.postId);
-    expect(await service.getPost(created.postId)).toMatchObject({
+    expect(await service.getPost(null, created.postId)).toMatchObject({
       postId: created.postId,
       deleted: true,
       author: null,
@@ -119,7 +119,7 @@ describe('getPost', () => {
   });
 
   test('never existed -> null', async () => {
-    expect(await service.getPost(NO_POST)).toBeNull();
+    expect(await service.getPost(null, NO_POST)).toBeNull();
   });
 });
 
@@ -127,7 +127,7 @@ describe('deletePost', () => {
   test('soft-deletes your own post', async () => {
     const created = await service.createPost(author.userId, { content: 'regret' });
     await service.deletePost(author.userId, created.postId);
-    expect(await service.getPost(created.postId)).toMatchObject({ deleted: true, content: null });
+    expect(await service.getPost(null, created.postId)).toMatchObject({ deleted: true, content: null });
   });
 
   test('deleting your own already-deleted post is a no-op', async () => {
@@ -140,7 +140,7 @@ describe('deletePost', () => {
     const other = await createUser(pool);
     const created = await service.createPost(author.userId, { content: 'mine' });
     await expect(service.deletePost(other.userId, created.postId)).rejects.toMatchObject({ status: 403 });
-    expect(await service.getPost(created.postId)).toMatchObject({ deleted: false, content: 'mine' });
+    expect(await service.getPost(null, created.postId)).toMatchObject({ deleted: false, content: 'mine' });
   });
 
   test("someone else's already-deleted post is still 403", async () => {
@@ -161,7 +161,10 @@ describe('deletePost', () => {
     const original = await service.createPost(author.userId, { content: 'original' });
     const reply = await service.createPost(author.userId, { content: 'reply', parentPostId: original.postId });
     await service.deletePost(author.userId, original.postId);
-    expect(await service.getPost(reply.postId)).toMatchObject({ content: 'reply', parentPostId: original.postId });
+    expect(await service.getPost(null, reply.postId)).toMatchObject({
+      content: 'reply',
+      parentPostId: original.postId,
+    });
   });
 });
 
@@ -188,7 +191,7 @@ describe('listReplies', () => {
 
   test('{ items, nextCursor }: direct replies as post views, oldest first', async () => {
     const expected = await replies(2);
-    const page = await service.listReplies(original.postId, { limit: 10 });
+    const page = await service.listReplies(null, original.postId, { limit: 10 });
     expect(ids(page)).toEqual(expected);
     expect(page.nextCursor).toBeNull();
     expect(page.items[0]).toMatchObject({ content: 'reply 0', parentPostId: original.postId });
@@ -200,7 +203,7 @@ describe('listReplies', () => {
     let cursor = null;
     let pages = 0;
     do {
-      const page = await service.listReplies(original.postId, { limit: 2, cursor });
+      const page = await service.listReplies(null, original.postId, { limit: 2, cursor });
       seen.push(...ids(page));
       // The service hands out an encoded string; decode it the way the query schema will.
       cursor = page.nextCursor && decodeCursor(page.nextCursor);
@@ -212,7 +215,7 @@ describe('listReplies', () => {
 
   test('exactly limit replies -> nextCursor is null', async () => {
     await replies(2);
-    const page = await service.listReplies(original.postId, { limit: 2 });
+    const page = await service.listReplies(null, original.postId, { limit: 2 });
     expect(page.items).toHaveLength(2);
     expect(page.nextCursor).toBeNull();
   });
@@ -220,14 +223,14 @@ describe('listReplies', () => {
   test('a deleted post still lists its replies', async () => {
     await replies(1);
     await service.deletePost(author.userId, original.postId);
-    expect((await service.listReplies(original.postId, { limit: 10 })).items).toHaveLength(1);
+    expect((await service.listReplies(null, original.postId, { limit: 10 })).items).toHaveLength(1);
   });
 
   test('no replies -> empty page', async () => {
-    expect(await service.listReplies(original.postId, { limit: 10 })).toEqual({ items: [], nextCursor: null });
+    expect(await service.listReplies(null, original.postId, { limit: 10 })).toEqual({ items: [], nextCursor: null });
   });
 
   test('never existed -> null', async () => {
-    expect(await service.listReplies(NO_POST, { limit: 10 })).toBeNull();
+    expect(await service.listReplies(null, NO_POST, { limit: 10 })).toBeNull();
   });
 });

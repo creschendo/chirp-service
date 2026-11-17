@@ -10,22 +10,27 @@
 import * as store from './store.js';
 import * as usersStore from '../users/store.js';
 import { toPage } from '../../pagination.js';
+import { withEngagement } from '../engagement/service.js';
 
-// GET /timeline. A page of the viewer's home timeline: { items, nextCursor } (see src/pagination.js).
+// GET /timeline. A page of the viewer's home timeline: { items, nextCursor } (see src/pagination.js), each item with
+// engagement for the viewer. A repost item carries the original post's numbers.
 export async function getHomeTimeline(viewerId, { limit, cursor = null }) {
   const rows = await store.listHomePosts(viewerId, { limit: limit + 1, cursor });
-  return toPage(rows, limit, nextCursor);
+  const page = toPage(rows, limit, nextCursor);
+  return { ...page, items: await withEngagement(viewerId, page.items) };
 }
 
-// GET /users/:username/posts. A page of that user's posts, or null if the user doesn't exist (the route 404s).
-// Without the lookup, an unknown user and a user with no posts would both be an empty page.
-export async function getProfileTimeline(username, { limit, cursor = null }) {
+// GET /users/:username/posts. A page of that user's posts and reposts, each item with engagement for viewerId (null
+// when logged out), or null if the user doesn't exist (the route 404s). Without the lookup, an unknown user and a user
+// with no posts would both be an empty page.
+export async function getProfileTimeline(viewerId, username, { limit, cursor = null }) {
   const user = await usersStore.getProfileByUsername(username);
   if (!user) {
     return null;
   }
   const rows = await store.listProfilePosts(user.userId, { limit: limit + 1, cursor });
-  return toPage(rows, limit, nextCursor);
+  const page = toPage(rows, limit, nextCursor);
+  return { ...page, items: await withEngagement(viewerId, page.items) };
 }
 
 // The next page continues after the last item's sort keys: a repost's time and id, or a plain post's. One extra row

@@ -400,6 +400,15 @@ describe('GET /users/:username/likes', () => {
       createdAt: expect.any(String),
       deleted: false,
       quotedPost: null,
+      engagement: {
+        likeCount: 1,
+        repostCount: 0,
+        replyCount: 0,
+        quoteCount: 0,
+        liked: false,
+        reposted: false,
+        bookmarked: false,
+      },
       likedAt: expect.any(String),
     });
     expect(res.body.nextCursor).toBeNull();
@@ -491,5 +500,142 @@ describe('GET /users/me/bookmarks', () => {
   test("/users/me/likes is a 400, not someone's likes: 'me' is too short to be a username", async () => {
     const res = await request(app).get('/users/me/likes');
     expect(res.status).toBe(400);
+  });
+});
+
+// --- Engagement in post responses ---
+// Every endpoint that returns posts adds engagement: counts for everyone, and flags for whoever is looking.
+
+describe('engagement in post responses', () => {
+  let carol;
+  beforeEach(async () => {
+    carol = await createUser(pool);
+    // Bob's post: liked by alice, reposted by carol.
+    await request(app).post(`/posts/${postId}/like`).set('Cookie', cookie);
+    await request(app).post(`/posts/${postId}/repost`).set('Cookie', authCookie(carol.userId));
+  });
+
+  const get = (url, as) => {
+    const req = request(app).get(url);
+    if (as) req.set('Cookie', as);
+    return req;
+  };
+  const counts = { likeCount: 1, repostCount: 1, replyCount: 0, quoteCount: 0 };
+  const noFlags = { liked: false, reposted: false, bookmarked: false };
+
+  describe('GET /posts/:post_id', () => {
+    test("flags are the viewer's own", async () => {
+      const asAlice = await get(`/posts/${postId}`, cookie);
+      const asCarol = await get(`/posts/${postId}`, authCookie(carol.userId));
+
+      expect(asAlice.body.engagement).toEqual({ ...counts, ...noFlags, liked: true });
+      expect(asCarol.body.engagement).toEqual({ ...counts, ...noFlags, reposted: true });
+    });
+
+    test('logged out: the same counts, every flag false', async () => {
+      const res = await get(`/posts/${postId}`);
+      expect(res.status).toBe(200);
+      expect(res.body.engagement).toEqual({ ...counts, ...noFlags });
+    });
+
+    test.each([
+      ['an expired token', () => authCookie(alice.userId, { expiresIn: -1 })],
+      ['a forged token', () => authCookie(alice.userId, { secret: 'not-the-real-secret' })],
+    ])('%s counts as logged out: 200, flags false', async (_, makeCookie) => {
+      const res = await get(`/posts/${postId}`, makeCookie());
+      expect(res.status).toBe(200);
+      expect(res.body.engagement).toEqual({ ...counts, ...noFlags });
+    });
+
+    test('a deleted post gets engagement: null', async () => {
+      await request(app).delete(`/posts/${postId}`).set('Cookie', authCookie(bob.userId));
+
+      const res = await get(`/posts/${postId}`, cookie);
+
+      expect(res.body).toMatchObject({ deleted: true, engagement: null });
+    });
+
+    test('replies show up in the count', async () => {
+      await request(app).post('/posts').set('Cookie', cookie).send({ content: 'reply', parentPostId: postId });
+      expect((await get(`/posts/${postId}`)).body.engagement.replyCount).toBe(1);
+    });
+  });
+
+  describe('GET /posts/:post_id/replies', () => {
+    test("each reply has its own counts and the viewer's flags; a deleted reply gets null", async () => {
+      const reply = (content) =>
+        request(app).post('/posts').set('Cookie', authCookie(bob.userId)).send({ content, parentPostId: postId });
+      const kept = (await reply('kept')).body.postId;
+      const gone = (await reply('gone')).body.postId;
+      await request(app).post(`/posts/${kept}/like`).set('Cookie', cookie);
+      await request(app).delete(`/posts/${gone}`).set('Cookie', authCookie(bob.userId));
+
+      const asAlice = await get(`/posts/${postId}/replies`, cookie);
+      const loggedOut = await get(`/posts/${postId}/replies`);
+
+      const byId = (res) => Object.fromEntries(res.body.items.map((item) => [item.postId, item.engagement]));
+      expect(byId(asAlice)[kept]).toEqual({ ...counts, repostCount: 0, ...noFlags, liked: true });
+      expect(byId(asAlice)[gone]).toBeNull();
+      expect(byId(loggedOut)[kept]).toEqual({ ...counts, repostCount: 0, ...noFlags });
+    });
+  });
+
+  describe('GET /timeline', () => {
+    test("a repost item carries the original post's counts and the viewer's flags", async () => {
+      await request(app).post(`/users/me/following/${carol.userId}`).set('Cookie', cookie);
+
+      const res = await get('/timeline', cookie);
+
+      expect(res.body.items).toEqual([
+        expect.objectContaining({
+          postId,
+          repost: expect.objectContaining({ user: expect.objectContaining({ userId: carol.userId }) }),
+          engagement: { ...counts, ...noFlags, liked: true },
+        }),
+      ]);
+    });
+  });
+
+  describe('GET /users/:username/posts', () => {
+    test('logged in, the viewer gets their own flags; logged out, they are false', async () => {
+      const asAlice = await get(`/users/${carol.username}/posts`, cookie);
+      const loggedOut = await get(`/users/${carol.username}/posts`);
+
+      expect(asAlice.body.items[0].engagement).toEqual({ ...counts, ...noFlags, liked: true });
+      expect(loggedOut.body.items[0].engagement).toEqual({ ...counts, ...noFlags });
+    });
+
+    test('a stale token still loads the profile, as logged out', async () => {
+      const res = await get(`/users/${carol.username}/posts`, authCookie(alice.userId, { expiresIn: -1 }));
+      expect(res.status).toBe(200);
+      expect(res.body.items[0].engagement).toEqual({ ...counts, ...noFlags });
+    });
+  });
+
+  describe('GET /users/:username/likes', () => {
+    test('the flags belong to whoever is looking, not the user whose likes these are', async () => {
+      const asAlice = await get(`/users/${alice.username}/likes`, cookie);
+      const asCarol = await get(`/users/${alice.username}/likes`, authCookie(carol.userId));
+
+      expect(asAlice.body.items[0].engagement).toEqual({ ...counts, ...noFlags, liked: true });
+      expect(asCarol.body.items[0].engagement).toEqual({ ...counts, ...noFlags, reposted: true });
+    });
+  });
+
+  describe('GET /users/me/bookmarks', () => {
+    test('every item is bookmarked, with the rest of your flags', async () => {
+      await request(app).post(`/posts/${postId}/bookmark`).set('Cookie', cookie);
+
+      const res = await get('/users/me/bookmarks', cookie);
+
+      expect(res.body.items[0].engagement).toEqual({ ...counts, liked: true, reposted: false, bookmarked: true });
+    });
+  });
+
+  describe('POST /posts', () => {
+    test('a new post comes back with zero engagement', async () => {
+      const res = await request(app).post('/posts').set('Cookie', cookie).send({ content: 'new' });
+      expect(res.body.engagement).toEqual({ likeCount: 0, repostCount: 0, replyCount: 0, quoteCount: 0, ...noFlags });
+    });
   });
 });

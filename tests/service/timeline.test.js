@@ -103,26 +103,30 @@ describe('getProfileTimeline', () => {
     const newer = await postAt(alice, 1);
     await postAt(bob, 0);
 
-    const page = await service.getProfileTimeline('alice', { limit: 10 });
+    const page = await service.getProfileTimeline(null, 'alice', { limit: 10 });
     expect(ids(page)).toEqual([newer, older]);
     expect(page.nextCursor).toBeNull();
   });
 
   test('finds the user ignoring case', async () => {
     await postAt(alice, 1);
-    expect((await service.getProfileTimeline('ALICE', { limit: 10 })).items).toHaveLength(1);
+    expect((await service.getProfileTimeline(null, 'ALICE', { limit: 10 })).items).toHaveLength(1);
   });
 
   test('pages through everything with nextCursor', async () => {
     const expected = [];
     for (let i = 1; i <= 5; i++) expected.push(await postAt(alice, i));
-    const { seen, pages } = await pageThrough(service.getProfileTimeline, 'alice', 2);
+    const { seen, pages } = await pageThrough(
+      (username, query) => service.getProfileTimeline(null, username, query),
+      'alice',
+      2,
+    );
     expect(seen).toEqual(expected);
     expect(pages).toBe(3);
   });
 
   test('a user with no posts -> empty page; an unknown user -> null', async () => {
-    expect(await service.getProfileTimeline('bob', { limit: 10 })).toEqual({ items: [], nextCursor: null });
-    expect(await service.getProfileTimeline('nobody_here', { limit: 10 })).toBeNull();
+    expect(await service.getProfileTimeline(null, 'bob', { limit: 10 })).toEqual({ items: [], nextCursor: null });
+    expect(await service.getProfileTimeline(null, 'nobody_here', { limit: 10 })).toBeNull();
   });
 });

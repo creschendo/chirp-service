@@ -74,6 +74,15 @@ describe('GET /timeline', () => {
       createdAt: expect.any(String),
       deleted: false,
       quotedPost: null,
+      engagement: {
+        likeCount: 0,
+        repostCount: 0,
+        replyCount: 0,
+        quoteCount: 0,
+        liked: false,
+        reposted: false,
+        bookmarked: false,
+      },
       repost: null,
     });
   });

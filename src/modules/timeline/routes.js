@@ -3,9 +3,10 @@
 // /users/:username/posts has more segments than the users router's /:username, so they don't collide.
 // Both return { items, nextCursor }, newest first: originals, quotes and reposts; no replies (unless reposted);
 // deleted posts hidden (see store.js and src/pagination.js). Each item is a post view (the GET /posts/:post_id shape)
-// plus repost: { repostId, user, repostedAt } for a repost, or null.
+// plus repost: { repostId, user, repostedAt } for a repost, or null, and engagement (counts and the viewer's flags; a
+// repost item has the original post's).
 import { Router } from 'express';
-import { requireAuth } from '../../middleware/auth.js';
+import { optionalAuth, requireAuth } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import * as service from './service.js';
 import { timelineQuerySchema } from './schemas.js';
@@ -19,13 +20,15 @@ router.get('/timeline', requireAuth, validate({ query: timelineQuerySchema }), a
   res.json(await service.getHomeTimeline(req.userId, req.valid.query));
 });
 
-// GET /users/:username/posts (public) ?limit=&cursor= -> 200 + { items, nextCursor }: that user's posts and reposts.
+// GET /users/:username/posts (public, optional auth) ?limit=&cursor= -> 200 + { items, nextCursor }: that user's posts
+// and reposts. A logged-in viewer gets their own flags; logged out, they're false.
 // 400 invalid username or query, 404 user not found.
 router.get(
   '/users/:username/posts',
+  optionalAuth,
   validate({ params: usernameParamSchema, query: timelineQuerySchema }),
   async (req, res) => {
-    const page = await service.getProfileTimeline(req.valid.params.username, req.valid.query);
+    const page = await service.getProfileTimeline(req.userId, req.valid.params.username, req.valid.query);
     if (!page) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -34,6 +37,6 @@ router.get(
   },
 );
 
-// Deferred: a "Replies" tab on profiles, "new posts since" for refresh, counts and viewer flags per item.
+// Deferred: a "Replies" tab on profiles, "new posts since" for refresh.
 
 export default router;

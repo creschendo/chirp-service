@@ -5,7 +5,7 @@
 // with /users/:username/likes.
 // Writes follow the follows module's style: POST to do it, DELETE to undo, both idempotent, both need auth.
 import { Router } from 'express';
-import { requireAuth } from '../../middleware/auth.js';
+import { optionalAuth, requireAuth } from '../../middleware/auth.js';
 import { validate } from '../../middleware/validate.js';
 import * as service from './service.js';
 import { bookmarksQuerySchema, likesQuerySchema } from './schemas.js';
@@ -66,9 +66,10 @@ router.delete('/posts/:post_id/bookmark', requireAuth, validate({ params: postId
 // 400 invalid username or query, 404 user not found.
 router.get(
   '/users/:username/likes',
+  optionalAuth,
   validate({ params: usernameParamSchema, query: likesQuerySchema }),
   async (req, res) => {
-    const page = await service.listLikes(req.valid.params.username, req.valid.query);
+    const page = await service.listLikes(req.userId, req.valid.params.username, req.valid.query);
     if (!page) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -84,7 +85,7 @@ router.get('/users/me/bookmarks', requireAuth, validate({ query: bookmarksQueryS
   res.json(await service.listBookmarks(req.userId, req.valid.query));
 });
 
-// Not wired up yet: counts and viewer flags. They aren't routes of their own: every post view (GET /posts/:post_id,
-// replies, timelines and the two lists above) will get an engagement object through the service's withEngagement.
+// Every post view these lists return carries engagement: counts and the viewer's own flags (null for a deleted post).
+// The likes list is public with optionalAuth, so a logged-in viewer gets their own flags.
 
 export default router;

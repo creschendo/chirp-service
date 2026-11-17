@@ -36,12 +36,12 @@
 ## Milestone 4: Engagement
 
 - [x] Decide repost vs quote post modeling
-- [ ] Likes
-- [ ] Reposts
+- [x] Likes
+- [x] Reposts
 - [x] Quote posts
 - [ ] Replies and thread view
-- [ ] Bookmarks
-- [ ] Engagement counts and viewer flags in timelines
+- [x] Bookmarks
+- [x] Engagement counts and viewer flags in timelines
 - [ ] Tests
 
 ## Milestone 5: Notifications
