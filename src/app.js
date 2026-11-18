@@ -10,6 +10,7 @@ import postsRoutes from './modules/posts/routes.js';
 import timelineRoutes from './modules/timeline/routes.js';
 import messagesRoutes from './modules/messages/routes.js';
 import engagementRoutes from './modules/engagement/routes.js';
+import notificationsRoutes from './modules/notifications/routes.js';
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use('/users', usersRoutes);
 app.use('/users', followsRoutes);
 app.use('/posts', postsRoutes);
 app.use('/conversations', messagesRoutes);
+app.use('/notifications', notificationsRoutes);
 // Mounted at /: serves /timeline and /users/:username/posts.
 app.use('/', timelineRoutes);
 // Mounted at /: serves /posts/:post_id/like, /repost and /bookmark, /users/:username/likes and /users/me/bookmarks.
