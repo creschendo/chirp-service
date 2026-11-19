@@ -174,7 +174,13 @@ describe('markRead', () => {
   test('a future upTo only marks up to now', async () => {
     await followBobAt(alice, 1);
     await service.markRead(bob.userId, { upTo: new Date(Date.now() + 60 * 60 * 1000).toISOString() });
-    await service.notify({ type: 'follow', actorId: carol.userId, recipientId: bob.userId });
+    // A notification arriving after the mark, but well before the hour-ahead upTo: unread only if upTo was clamped.
+    // Placed a second ahead rather than at now(): the mark's now() and the insert's can land in the same millisecond,
+    // and a notification at exactly read_up_to counts as read.
+    const n = await service.notify({ type: 'follow', actorId: carol.userId, recipientId: bob.userId });
+    await pool.query(`UPDATE notifications SET created_at = now() + interval '1 second' WHERE notification_id = $1`, [
+      n.notificationId,
+    ]);
     expect(await service.getUnreadCount(bob.userId)).toEqual({ count: 1 });
   });
 });
