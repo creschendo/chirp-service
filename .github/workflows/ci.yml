@@ -1,0 +1,109 @@
+# CI for chirp-service: formatting + lint, the full test suite against Postgres, and a migrations round trip.
+# Runs on every pull request and on pushes to main. The three jobs run in parallel; lint and test are the ones to
+# require in branch protection.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same branch or PR cancels the run that's still going.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Dummy values: src/config requires all three, and nothing here is secret. The tests derive the test database
+  # from DATABASE_URL (chirp -> chirp_test) and create it themselves (tests/setup/globalSetup.js).
+  DATABASE_URL: postgres://chirp:chirp@localhost:5432/chirp
+  JWT_SECRET: ci-only-not-a-secret
+  CLIENT_ORIGIN: http://localhost:5173
+
+jobs:
+  lint:
+    name: Format and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      # Same image as compose.yaml. GitHub Actions can't share a services block between jobs, so it's repeated below.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: chirp
+          POSTGRES_PASSWORD: chirp
+          POSTGRES_DB: chirp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # --ci: never writes snapshots; fails instead.
+      - run: npm test -- --ci
+
+  migrations:
+    name: Migrations up, down, up
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: chirp
+          POSTGRES_PASSWORD: chirp
+          POSTGRES_DB: chirp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Up (all)
+        run: npm run migrate -- up
+      # The tests only ever run up, so this is what catches a broken down(): wrong drop order, a missed table.
+      - name: Down (all)
+        run: npm run migrate -- down "$(ls migrations/*.js | wc -l)"
+      - name: Nothing left behind
+        run: |
+          left=$(psql "$DATABASE_URL" -tAc \
+            "SELECT string_agg(tablename, ', ') FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'pgmigrations'")
+          if [ -n "$left" ]; then
+            echo "Tables left after migrating down: $left"
+            exit 1
+          fi
+      - name: Up again
+        run: npm run migrate -- up

@@ -32,7 +32,14 @@
 
 ## Running tests
 
-- Locally and (optionally) in CI
+- Locally: `npm run db:up`, then `npm test`. The tests create `<db>_test` and run migrations themselves.
+- In CI: `.github/workflows/ci.yml` runs on every pull request and on pushes to `main`, as three parallel jobs:
+  - **Format and lint:** `npm run format:check`, `npm run lint`
+  - **Tests:** `npm test -- --ci` against a Postgres 17 service container (same image as `compose.yaml`), with dummy
+    `DATABASE_URL`, `JWT_SECRET` and `CLIENT_ORIGIN`
+  - **Migrations up, down, up:** every migration up, all the way down (failing if any table is left), then up again,
+    since the tests only ever run `up`
+- Node version: `.nvmrc` (22), used by CI's `setup-node`; use the same locally (`nvm use`).
 
 ## Open questions
 
@@ -40,4 +47,3 @@
 - How will you isolate tests from each other if they run in parallel?
 - Will you aim for a coverage target, or focus on critical paths?
 - How will you test timeline ordering and pagination edge cases?
-- Will you set up GitHub Actions to run tests on push?
