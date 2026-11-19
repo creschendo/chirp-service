@@ -416,3 +416,80 @@ describe('withEngagement', () => {
     expect(await service.withEngagement(alice.userId, [])).toEqual([]);
   });
 });
+
+describe('notifications', () => {
+  // Bob's notifications as [type, actorId, postId], oldest first.
+  const bobsNotifications = async () =>
+    (
+      await pool.query(
+        `SELECT type, actor_id, post_id FROM notifications WHERE recipient_id = $1 ORDER BY created_at, type`,
+        [bob.userId],
+      )
+    ).rows.map((row) => [row.type, row.actor_id, row.post_id]);
+  const notificationCount = async () => (await pool.query('SELECT count(*)::int AS n FROM notifications')).rows[0].n;
+
+  describe.each([
+    ['like', service.like, service.unlike],
+    ['repost', service.repost, service.unrepost],
+  ])('%s', (type, act, undo) => {
+    test("notifies the post's author", async () => {
+      await act(alice.userId, postId);
+      expect(await bobsNotifications()).toEqual([[type, alice.userId, postId]]);
+    });
+
+    test('doing it again notifies once', async () => {
+      await act(alice.userId, postId);
+      await act(alice.userId, postId);
+      expect(await bobsNotifications()).toHaveLength(1);
+    });
+
+    test('on your own post: no notification', async () => {
+      await act(bob.userId, postId);
+      expect(await notificationCount()).toBe(0);
+    });
+
+    test('a 404 creates nothing', async () => {
+      await expect(act(alice.userId, NO_ID)).rejects.toMatchObject({ status: 404 });
+      expect(await notificationCount()).toBe(0);
+    });
+
+    test('undo removes the notification; doing it again notifies again', async () => {
+      await act(alice.userId, postId);
+      await undo(alice.userId, postId);
+      expect(await notificationCount()).toBe(0);
+      await act(alice.userId, postId);
+      expect(await bobsNotifications()).toEqual([[type, alice.userId, postId]]);
+    });
+
+    test('undo only removes your own notification of that type', async () => {
+      const carol = await createUser(pool);
+      const other = type === 'like' ? service.repost : service.like;
+      await act(alice.userId, postId);
+      await act(carol.userId, postId);
+      await other(alice.userId, postId);
+      await undo(alice.userId, postId);
+      expect(await bobsNotifications()).toEqual(
+        expect.arrayContaining([
+          [type, carol.userId, postId],
+          [type === 'like' ? 'repost' : 'like', alice.userId, postId],
+        ]),
+      );
+      expect(await bobsNotifications()).toHaveLength(2);
+    });
+
+    test('undo when you never did it is still a no-op', async () => {
+      await expect(undo(alice.userId, postId)).resolves.toBeUndefined();
+      expect(await notificationCount()).toBe(0);
+    });
+
+    test('concurrent attempts notify once', async () => {
+      await Promise.all(Array.from({ length: 5 }, () => act(alice.userId, postId)));
+      expect(await bobsNotifications()).toHaveLength(1);
+    });
+  });
+
+  test('bookmarks never notify', async () => {
+    await service.bookmark(alice.userId, postId);
+    expect(await notificationCount()).toBe(0);
+  });
+});

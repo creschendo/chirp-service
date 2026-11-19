@@ -639,3 +639,41 @@ describe('engagement in post responses', () => {
     });
   });
 });
+
+describe('notifications from likes and reposts', () => {
+  const bobCookie = () => authCookie(bob.userId);
+  const unreadCount = async () =>
+    (await request(app).get('/notifications/unread-count').set('Cookie', bobCookie())).body.count;
+
+  test("liking shows up in the author's notifications; unliking takes it back", async () => {
+    await request(app).post(`/posts/${postId}/like`).set('Cookie', cookie);
+    expect(await unreadCount()).toBe(1);
+    const { items } = (await request(app).get('/notifications').set('Cookie', bobCookie())).body;
+    expect(items).toEqual([
+      expect.objectContaining({
+        type: 'like',
+        actor: { userId: alice.userId, username: alice.username, displayName: alice.displayName },
+        post: expect.objectContaining({ postId }),
+        read: false,
+      }),
+    ]);
+
+    await request(app).delete(`/posts/${postId}/like`).set('Cookie', cookie);
+    expect(await unreadCount()).toBe(0);
+  });
+
+  test("reposting shows up in the author's notifications; un-reposting takes it back", async () => {
+    await request(app).post(`/posts/${postId}/repost`).set('Cookie', cookie);
+    const { items } = (await request(app).get('/notifications').set('Cookie', bobCookie())).body;
+    expect(items).toEqual([expect.objectContaining({ type: 'repost', post: expect.objectContaining({ postId }) })]);
+
+    await request(app).delete(`/posts/${postId}/repost`).set('Cookie', cookie);
+    expect(await unreadCount()).toBe(0);
+  });
+
+  test('your own like, and bookmarks, notify nobody', async () => {
+    await request(app).post(`/posts/${postId}/like`).set('Cookie', bobCookie());
+    await request(app).post(`/posts/${postId}/bookmark`).set('Cookie', cookie);
+    expect(await unreadCount()).toBe(0);
+  });
+});

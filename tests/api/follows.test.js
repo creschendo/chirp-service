@@ -208,3 +208,24 @@ describe.each([
     expect(res.status).toBe(400);
   });
 });
+
+describe('notifications from follows', () => {
+  test("following shows up in the followed user's notifications; unfollowing takes it back", async () => {
+    const me = await createUser(pool);
+    const them = await createUser(pool);
+    const theirCookie = authCookie(them.userId);
+
+    await request(app).post(`/users/me/following/${them.userId}`).set('Cookie', authCookie(me.userId));
+    expect((await request(app).get('/notifications/unread-count').set('Cookie', theirCookie)).body).toEqual({
+      count: 1,
+    });
+    expect((await request(app).get('/notifications').set('Cookie', theirCookie)).body.items).toEqual([
+      expect.objectContaining({ type: 'follow', actor: expect.objectContaining({ userId: me.userId }), post: null }),
+    ]);
+
+    await request(app).delete(`/users/me/following/${them.userId}`).set('Cookie', authCookie(me.userId));
+    expect((await request(app).get('/notifications/unread-count').set('Cookie', theirCookie)).body).toEqual({
+      count: 0,
+    });
+  });
+});

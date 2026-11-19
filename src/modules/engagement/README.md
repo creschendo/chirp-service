@@ -47,6 +47,8 @@ that returns posts.
 - A repost is new activity: a separate item in timelines at the time of the repost, by the reposter. The original post
   isn't changed and stays at its own time. Reposting again doesn't move it.
 - Likes are public; bookmarks are private and never notify.
+- A new like or repost notifies the post's author (not yourself, not on a repeat); undoing it deletes the
+  notification.
 - A missing or deleted post can't be liked, reposted or bookmarked (404, the same for both), but undoing always works.
 - Counts are computed on read, never stored. `replyCount` is direct replies only, matching what
   `GET /posts/:post_id/replies` lists; `replyCount` and `quoteCount` count live posts only.
@@ -94,13 +96,16 @@ items are counted. One extra query per page, however many items.
 - `posts`: the target of engagement; `getPostById` for the live check, `POST_VIEW_SELECT` / `toPostView` for lists
 - `users`: `getProfileByUsername` for the likes list
 - `timeline`: its store reads `reposts` to merge reposts into both timelines
-- `notifications` (later): a like or repost notifies the author only when it's new and not their own post
+- `notifications`: `like` and `repost` call `notify` when the like or repost is new (it skips your own post);
+  `unlike` and `unrepost` call `removeNotification` when something was removed. Each write and its notification
+  share one `withTransaction`. Bookmarks never notify.
 
 ## Tests
 
 - `tests/store/engagement.test.js`: writes, idempotency, `getEngagement`, both lists with cursor tie-breaks; todos for
   the cascades
-- `tests/service/engagement.test.js`: 404s, undo always working, concurrent reposts, lists, `withEngagement`
+- `tests/service/engagement.test.js`: 404s, undo always working, concurrent reposts, lists, `withEngagement`,
+  notifications (created once, not for yourself, removed on undo, concurrent attempts)
 - `tests/schemas/engagement.test.js`: both query schemas
 - `tests/api/engagement.test.js`: every route over HTTP, and engagement in every response that returns posts
 

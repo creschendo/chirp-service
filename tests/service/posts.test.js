@@ -2,6 +2,7 @@
 // and tables are emptied between tests, like the API tests.
 import * as service from '../../src/modules/posts/service.js';
 import * as store from '../../src/modules/posts/store.js';
+import * as notificationsService from '../../src/modules/notifications/service.js';
 import { pool, resetDatabase } from '../helpers/db.js';
 import { createUser } from '../helpers/factories.js';
 import { decodeCursor } from '../../src/pagination.js';
@@ -232,5 +233,72 @@ describe('listReplies', () => {
 
   test('never existed -> null', async () => {
     expect(await service.listReplies(null, NO_POST, { limit: 10 })).toBeNull();
+  });
+});
+
+describe('createPost notifications', () => {
+  // All notifications as [type, actorId, recipientId, postId].
+  const allNotifications = async () =>
+    (await pool.query('SELECT type, actor_id, recipient_id, post_id FROM notifications ORDER BY created_at')).rows.map(
+      (row) => [row.type, row.actor_id, row.recipient_id, row.post_id],
+    );
+
+  let other;
+  let original;
+  beforeEach(async () => {
+    other = await createUser(pool);
+    original = await service.createPost(author.userId, { content: 'original' });
+  });
+
+  test('an original post notifies nobody', async () => {
+    expect(await allNotifications()).toEqual([]);
+  });
+
+  test("a reply notifies the parent's author, pointing at the reply", async () => {
+    const reply = await service.createPost(other.userId, { content: 'reply', parentPostId: original.postId });
+    expect(await allNotifications()).toEqual([['reply', other.userId, author.userId, reply.postId]]);
+  });
+
+  test("a quote notifies the quoted post's author, pointing at the quote", async () => {
+    const quote = await service.createPost(other.userId, { content: 'quote', quotedPostId: original.postId });
+    expect(await allNotifications()).toEqual([['quote', other.userId, author.userId, quote.postId]]);
+  });
+
+  test("a nested reply notifies only the direct parent's author, not the root's", async () => {
+    const third = await createUser(pool);
+    const reply = await service.createPost(other.userId, { content: 'reply', parentPostId: original.postId });
+    const nested = await service.createPost(third.userId, { content: 'nested', parentPostId: reply.postId });
+    const forNested = (await allNotifications()).filter(([, , , postId]) => postId === nested.postId);
+    expect(forNested).toEqual([['reply', third.userId, other.userId, nested.postId]]);
+  });
+
+  test('replying to or quoting your own post notifies nobody', async () => {
+    await service.createPost(author.userId, { content: 'reply', parentPostId: original.postId });
+    await service.createPost(author.userId, { content: 'quote', quotedPostId: original.postId });
+    expect(await allNotifications()).toEqual([]);
+  });
+
+  test('each reply is its own notification', async () => {
+    await service.createPost(other.userId, { content: 'one', parentPostId: original.postId });
+    await service.createPost(other.userId, { content: 'two', parentPostId: original.postId });
+    expect(await allNotifications()).toHaveLength(2);
+  });
+
+  test('a 404 parent or quoted post creates neither a post nor a notification', async () => {
+    await expect(service.createPost(other.userId, { content: 'x', parentPostId: NO_POST })).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(service.createPost(other.userId, { content: 'x', quotedPostId: NO_POST })).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(await allNotifications()).toEqual([]);
+  });
+
+  test('deleting the reply keeps the row but hides it from the list and the unread count', async () => {
+    const reply = await service.createPost(other.userId, { content: 'reply', parentPostId: original.postId });
+    await service.deletePost(other.userId, reply.postId);
+    expect(await allNotifications()).toHaveLength(1);
+    expect(await notificationsService.getUnreadCount(author.userId)).toEqual({ count: 0 });
+    expect((await notificationsService.listNotifications(author.userId, { limit: 20 })).items).toEqual([]);
   });
 });

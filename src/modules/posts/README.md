@@ -100,7 +100,9 @@ Decisions are recorded in [docs/database-schema.md](../../../docs/database-schem
 - `timeline`: profile and home timelines will reuse `POST_VIEW_SELECT` (not built yet)
 - `engagement`: `withEngagement` adds `engagement` (counts and the viewer's flags; null for a deleted post) to every
   post view these routes return. `GET /posts/:post_id` and its replies use `optionalAuth` for the viewer.
-- `notifications`: reply and quote notifications to the other post's author (not built yet)
+- `notifications`: `createPost` calls `notify` in the same transaction as the insert: a reply notifies the direct
+  parent's author, a quote the quoted post's author (never yourself). Deleting a reply or quote leaves the row; the
+  notifications queries hide it.
 
 ## Tests
 

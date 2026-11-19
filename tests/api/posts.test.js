@@ -306,3 +306,32 @@ describe('GET /posts/:post_id/replies', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('notifications from replies and quotes', () => {
+  test("replying and quoting show up in the original author's notifications; deleting the reply hides it", async () => {
+    const original = (await post({ content: 'original' })).body;
+    const other = await createUser(pool);
+    const otherCookie = authCookie(other.userId);
+    const reply = (await post({ content: 'reply', parentPostId: original.postId }, otherCookie)).body;
+    const quote = (await post({ content: 'quote', quotedPostId: original.postId }, otherCookie)).body;
+
+    const { items } = (await request(app).get('/notifications').set('Cookie', cookie)).body;
+    expect(items).toEqual([
+      expect.objectContaining({
+        type: 'quote',
+        actor: expect.objectContaining({ userId: other.userId }),
+        post: expect.objectContaining({
+          postId: quote.postId,
+          quotedPost: expect.objectContaining({ postId: original.postId }),
+        }),
+      }),
+      expect.objectContaining({
+        type: 'reply',
+        post: expect.objectContaining({ postId: reply.postId, parentPostId: original.postId }),
+      }),
+    ]);
+
+    await request(app).delete(`/posts/${reply.postId}`).set('Cookie', otherCookie);
+    expect((await request(app).get('/notifications/unread-count').set('Cookie', cookie)).body).toEqual({ count: 1 });
+  });
+});

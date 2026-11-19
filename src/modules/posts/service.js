@@ -3,27 +3,38 @@ import * as store from './store.js';
 import { badRequest, forbidden, notFound } from '../../errors.js';
 import { toPage } from '../../pagination.js';
 import { withEngagement } from '../engagement/service.js';
+import * as notifications from '../notifications/service.js';
+import { withTransaction } from '../../db/index.js';
 
 // POST /posts. Creates an original, a reply (parentPostId) or a quote (quotedPostId) and returns its post view, with
 // engagement for the author (always zeros on a new post, but the same shape as every other post response).
 // Throws 400 if both ids are given (the schema rejects that too), 404 if the parent or quoted post doesn't exist
-// or is deleted. Later: reply/quote notifications to the other post's author (not to yourself).
+// or is deleted.
+// A reply notifies the parent's author (only the direct parent, not the thread's root); a quote notifies the quoted
+// post's author. Never yourself (notify skips it). The post and its notification share a transaction. Deleting the
+// reply or quote later doesn't remove the notification: notifications about deleted posts are hidden on read.
 export async function createPost(authorId, { content, parentPostId = null, quotedPostId = null }) {
   if (parentPostId && quotedPostId) {
     throw badRequest('A post can be a reply or a quote, not both');
   }
 
-  let rootPostId = null;
-  if (parentPostId) {
-    const parent = await liveTarget(parentPostId);
-    // Replying to a reply joins its conversation; replying to an original starts one rooted at it.
-    rootPostId = parent.rootPostId ?? parent.postId;
-  }
-  if (quotedPostId) {
-    await liveTarget(quotedPostId);
-  }
+  const parent = parentPostId ? await liveTarget(parentPostId) : null;
+  const quoted = quotedPostId ? await liveTarget(quotedPostId) : null;
+  // Replying to a reply joins its conversation; replying to an original starts one rooted at it.
+  const rootPostId = parent ? (parent.rootPostId ?? parent.postId) : null;
+  // Who to notify, if anyone: a post is a reply or a quote, never both.
+  const target = parent ? { type: 'reply', post: parent } : quoted ? { type: 'quote', post: quoted } : null;
 
-  const { postId } = await store.createPost({ authorId, content, parentPostId, rootPostId, quotedPostId });
+  const { postId } = await withTransaction(async (client) => {
+    const created = await store.createPost({ authorId, content, parentPostId, rootPostId, quotedPostId }, client);
+    if (target) {
+      await notifications.notify(
+        { type: target.type, actorId: authorId, recipientId: target.post.authorId, postId: created.postId },
+        client,
+      );
+    }
+    return created;
+  });
   const [post] = await withEngagement(authorId, [await store.getPostView(postId)]);
   return post;
 }

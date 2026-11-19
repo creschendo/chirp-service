@@ -11,9 +11,14 @@
 //   to or quoting one). Existing engagement on a post that gets deleted stays in the tables but is hidden, because
 //   lists and timelines skip deleted posts.
 // - Counts are computed on read, never stored.
+// - A new like or repost notifies the post's author (not yourself, not on a repeat); undoing it deletes the
+//   notification. The write and the notification share a transaction, so neither exists without the other.
+//   Bookmarks never notify.
 import * as store from './store.js';
 import * as postsStore from '../posts/store.js';
 import * as usersStore from '../users/store.js';
+import * as notifications from '../notifications/service.js';
+import { withTransaction } from '../../db/index.js';
 import { notFound } from '../../errors.js';
 import { toPage } from '../../pagination.js';
 
@@ -47,36 +52,55 @@ async function liveTarget(postId) {
 
 // POST /posts/:post_id/like. Likes the post; liking it again is a no-op, and the first like keeps its time. Your own
 // posts can be liked. Throws 404 if the post doesn't exist or is deleted.
-// If the post is deleted between the check and the insert, the like is still stored, but nothing shows it: lists
-// and timelines skip deleted posts.
-// Later, only when the like is new and the post isn't your own: a like notification to the author.
+// A new like notifies the author, in the same transaction (notify skips your own post); liking again doesn't.
+// If the post is deleted between the check and the insert, the like and its notification are still stored, but
+// nothing shows them: lists, timelines and notifications skip deleted posts.
 export async function like(userId, postId) {
-  await liveTarget(postId);
-  await store.addLike(userId, postId);
+  const post = await liveTarget(postId);
+  await withTransaction(async (client) => {
+    if (await store.addLike(userId, postId, client)) {
+      await notifications.notify({ type: 'like', actorId: userId, recipientId: post.authorId, postId }, client);
+    }
+  });
 }
 
-// DELETE /posts/:post_id/like. Removes your like. Never fails for a valid id: no existence check, so you can always
-// undo, even on a post that has since been deleted, and unliking something you never liked (or an unknown post) is a
-// no-op.
+// DELETE /posts/:post_id/like. Removes your like and its notification. Never fails for a valid id: no existence check,
+// so you can always undo, even on a post that has since been deleted, and unliking something you never liked (or an
+// unknown post) is a no-op.
 export async function unlike(userId, postId) {
-  await store.removeLike(userId, postId);
+  await withTransaction(async (client) => {
+    if (await store.removeLike(userId, postId, client)) {
+      await notifications.removeNotification({ type: 'like', actorId: userId, postId }, client);
+    }
+  });
 }
 
 // POST /posts/:post_id/repost. Reposts the post: a new item in timelines at the time of the repost, with the original
 // left where it is. Your own posts can be reposted. Returns { repostId, repostedAt, created }: reposting again returns
 // the existing repost with created false (the route sends 201 or 200), and doesn't move it to the top.
 // Throws 404 if the post doesn't exist or is deleted.
-// Later, only when created and the post isn't your own: a repost notification to the author.
+// A new repost notifies the author, in the same transaction (not your own post, not a repeat). addRepost's
+// find-or-insert still works inside it: under READ COMMITTED each statement sees rows committed before it started.
 export async function repost(userId, postId) {
-  await liveTarget(postId);
-  const { repostId, createdAt, created } = await store.addRepost(userId, postId);
+  const post = await liveTarget(postId);
+  const { repostId, createdAt, created } = await withTransaction(async (client) => {
+    const result = await store.addRepost(userId, postId, client);
+    if (result.created) {
+      await notifications.notify({ type: 'repost', actorId: userId, recipientId: post.authorId, postId }, client);
+    }
+    return result;
+  });
   return { repostId, repostedAt: createdAt, created };
 }
 
-// DELETE /posts/:post_id/repost. Removes your repost and its timeline item. Like unlike, no existence check: you can
-// always undo, and un-reposting something you never reposted (or an unknown post) is a no-op.
+// DELETE /posts/:post_id/repost. Removes your repost, its timeline item and its notification. Like unlike, no
+// existence check: you can always undo, and un-reposting something you never reposted (or an unknown post) is a no-op.
 export async function unrepost(userId, postId) {
-  await store.removeRepost(userId, postId);
+  await withTransaction(async (client) => {
+    if (await store.removeRepost(userId, postId, client)) {
+      await notifications.removeNotification({ type: 'repost', actorId: userId, postId }, client);
+    }
+  });
 }
 
 // POST /posts/:post_id/bookmark. Bookmarks the post, privately: nobody else can see it, and it never notifies.

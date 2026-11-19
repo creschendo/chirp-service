@@ -213,9 +213,7 @@ function toMessageView(row) {
   return {
     messageId: row.message_id,
     conversationId: row.conversation_id,
-    sender: row.s_user_id
-      ? { userId: row.s_user_id, username: row.s_username, displayName: row.s_display_name }
-      : null,
+    sender: row.s_user_id ? { userId: row.s_user_id, username: row.s_username, displayName: row.s_display_name } : null,
     content: row.content,
     createdAt: row.created_at,
     deleted: row.deleted_at !== null,

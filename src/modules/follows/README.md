@@ -40,7 +40,9 @@ Implemented and tested: follow, unfollow, followers list, following list.
 ## Rules
 
 - **Idempotent:** following someone you already follow, or unfollowing someone you don't, is a no-op (still 204).
-  The store still returns `true`/`false`, so notifications can fire only on a new follow.
+  The store still returns `true`/`false`, so only a new follow notifies.
+- **Notifications:** a new follow notifies the followed user; unfollowing removes it. The follow and its notification
+  share one transaction. Following again after unfollowing notifies again.
 - **Self-follow:** rejected by the service (400) and by the `follows_no_self_follow` constraint.
 - **Unknown user:** the foreign key fails (`23503`), which the service maps to 404.
 - **Deleting a user** deletes their follows in both directions (`ON DELETE CASCADE`).
@@ -57,12 +59,15 @@ Implemented and tested: follow, unfollow, followers list, following list.
 
 - `users`: `getProfileByUsername` to resolve usernames; lists join `users` read-only for public fields
 - `timeline`: who appears in the home timeline (not built yet)
-- `notifications`: "new follower" notifications (not built yet)
+- `notifications`: `follow` calls `notify` on a new follow, `unfollow` calls `removeNotification` when a follow was
+  removed, each inside the same `withTransaction` as the write
 
 ## Tests
 
 - `tests/store/follows.test.js`: follows store, including cursor tie-breaks
-- `tests/api/follows.test.js`: all four routes, including paging through lists with `nextCursor`
+- `tests/service/follows.test.js`: follow/unfollow rules and their notifications
+- `tests/api/follows.test.js`: all four routes, including paging through lists with `nextCursor`, and the follow
+  notification end to end
 
 ## Open questions / not built yet
 
