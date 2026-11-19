@@ -1,18 +1,25 @@
 // npm run db:seed: replaces all data in the database DATABASE_URL points at with a fake but realistic dataset:
-// users, follows, and two weeks of posts, replies, quotes and a few deleted posts.
+// users, follows, two weeks of posts, replies, quotes and a few deleted posts, likes, reposts and bookmarks, direct
+// and group conversations, and the notifications all of that would have created.
 //
 // - Repeatable: a fixed random seed means the same data every run.
 // - Uses the app's store functions, so the data obeys the same rules and constraints as real data.
+// - Every row is backdated to a time that makes sense: a like after its post, a reply after its parent, a message
+//   after its sender joined the conversation.
 // - One transaction: it clears and inserts everything, or changes nothing.
 // - Refuses to run in production.
 //
-// Every seeded account's password is PASSWORD below. Log in as `alice` to see a busy home timeline.
+// Every seeded account's password is PASSWORD below. Log in as `alice` to see a busy home timeline, likes on her
+// posts, unread notifications and a couple of unread conversations.
 import bcrypt from 'bcrypt';
 import config from '../src/config/index.js';
 import { pool, withTransaction, truncateAllTables } from '../src/db/index.js';
 import * as usersStore from '../src/modules/users/store.js';
 import * as followsStore from '../src/modules/follows/store.js';
 import * as postsStore from '../src/modules/posts/store.js';
+import * as engagementStore from '../src/modules/engagement/store.js';
+import * as messagesStore from '../src/modules/messages/store.js';
+import * as notificationsStore from '../src/modules/notifications/store.js';
 
 if (config.env === 'production') {
   console.error('db:seed refuses to run with NODE_ENV=production.');
@@ -23,6 +30,10 @@ const PASSWORD = 'password123';
 const SEED = 42; // change for a different (but still repeatable) dataset
 const POST_COUNT = 150;
 const DAYS = 14; // posts are spread over the last two weeks
+const DAY = 24 * 60 * 60 * 1000;
+const MINUTE = 60 * 1000;
+// Notifications up to this long ago are read for alice, so she sees both read and unread ones.
+const ALICE_NOTIFICATIONS_READ_AGO = 2 * DAY;
 
 // --- Repeatable randomness (mulberry32: a tiny seeded generator) ---
 
@@ -133,7 +144,175 @@ const QUOTES = [
   'Couldn’t have said it better.',
 ];
 
+// Conversations, as scripts. Messages are [username, text], oldest first, a few minutes to an hour or so apart,
+// starting `startDaysAgo` days ago. Everyone has read everything except alice, who hasn't read the last
+// `aliceUnread` messages (all from others). `joinsLater` adds a member just before that message index, so the
+// messages before it stay hidden from them. `deleted` is the index of a message its sender deleted.
+const CONVERSATIONS = [
+  {
+    kind: 'direct',
+    members: ['alice', 'bob'],
+    startDaysAgo: 3,
+    aliceUnread: 2,
+    deleted: 4,
+    messages: [
+      ['bob', 'Did you see the new ramen place opened?'],
+      ['alice', 'No! Where?'],
+      ['bob', 'Corner of 5th and Main. Line was around the block.'],
+      ['alice', 'Okay we are going this weekend.'],
+      ['bob', 'Oops, wrong chat.'],
+      ['alice', 'Saturday lunch?'],
+      ['bob', 'Saturday works.'],
+      ['bob', 'Actually can we do 1pm instead of noon?'],
+      ['bob', 'Also bringing Carol if that is okay.'],
+    ],
+  },
+  {
+    kind: 'direct',
+    members: ['alice', 'carol'],
+    startDaysAgo: 6,
+    aliceUnread: 0,
+    messages: [
+      ['alice', 'Thanks for reviewing my PR yesterday.'],
+      ['carol', 'Of course. The cursor pagination part was really clean.'],
+      ['alice', 'Took me three tries to get the tie-breaks right.'],
+      ['carol', 'Worth it. Want to pair on the notifications work next week?'],
+      ['alice', 'Yes please.'],
+    ],
+  },
+  {
+    kind: 'direct',
+    members: ['bob', 'dave_codes'],
+    startDaysAgo: 5,
+    aliceUnread: 0,
+    messages: [
+      ['dave_codes', 'Is the deploy still happening today?'],
+      ['bob', 'Pushed it to tomorrow, waiting on one more review.'],
+      ['dave_codes', 'Makes sense. Ping me when it is out.'],
+    ],
+  },
+  {
+    kind: 'group',
+    name: 'Weekend plans',
+    members: ['alice', 'bob', 'erin', 'frank_eats'],
+    startDaysAgo: 2,
+    aliceUnread: 1,
+    messages: [
+      ['erin', 'Hike on Sunday? Weather looks good.'],
+      ['frank_eats', 'I am in if there are snacks.'],
+      ['alice', 'There are always snacks.'],
+      ['bob', 'Count me in. 9am at the trailhead?'],
+      ['erin', '9am works.'],
+      ['frank_eats', 'I will bring the good trail mix.'],
+    ],
+  },
+  {
+    kind: 'group',
+    name: 'Book club',
+    members: ['alice', 'grace_h', 'heidi'],
+    joinsLater: { username: 'olivia_art', before: 3 },
+    startDaysAgo: 9,
+    aliceUnread: 0,
+    messages: [
+      ['grace_h', 'Next pick: something about distributed systems?'],
+      ['heidi', 'Only if it has pictures.'],
+      ['alice', 'Designing Data-Intensive Applications has diagrams. Close enough.'],
+      ['grace_h', 'Added Olivia, she asked to join.'],
+      ['olivia_art', 'Hi all! Happy to be here.'],
+      ['heidi', 'Welcome! We start chapter one on Monday.'],
+    ],
+  },
+];
+
 // --- Seeding ---
+
+// One conversation from a script (see CONVERSATIONS). Uses the messages store, then backdates: members join at the
+// start (or just before a later message), each message is a few minutes after the last, the inbox sort key is the
+// newest message, and read state is set so only alice has anything unread.
+async function seedConversation(script, usersByName, now, db) {
+  const user = (username) => usersByName.get(username);
+  const memberIds = script.members.map((username) => user(username).userId);
+  const { conversationId } =
+    script.kind === 'direct'
+      ? await messagesStore.findOrCreateDirect(memberIds[0], memberIds[1], db)
+      : await messagesStore.createGroup({ name: script.name }, db);
+  await messagesStore.addParticipants(conversationId, memberIds, db);
+
+  // Message times, oldest first.
+  let at = now - script.startDaysAgo * DAY;
+  const startedAt = new Date(at);
+  const times = script.messages.map(() => {
+    at += int(2, 90) * MINUTE;
+    return new Date(at);
+  });
+
+  const joinedAt = new Map(script.members.map((username) => [username, startedAt]));
+  if (script.joinsLater) {
+    const { username, before } = script.joinsLater;
+    joinedAt.set(username, new Date(times[before].getTime() - MINUTE));
+    await messagesStore.addParticipants(conversationId, [user(username).userId], db);
+  }
+
+  const messageIds = [];
+  for (const [i, [username, content]] of script.messages.entries()) {
+    const message = await messagesStore.createMessage({ conversationId, senderId: user(username).userId, content }, db);
+    await db.query('UPDATE messages SET created_at = $2 WHERE message_id = $1', [message.messageId, times[i]]);
+    messageIds.push(message.messageId);
+  }
+  if (script.deleted !== undefined) {
+    const [username] = script.messages[script.deleted];
+    await messagesStore.softDeleteMessage(messageIds[script.deleted], user(username).userId, db);
+  }
+
+  const newest = times.at(-1);
+  await db.query('UPDATE conversations SET created_at = $2, last_activity_at = $3 WHERE conversation_id = $1', [
+    conversationId,
+    startedAt,
+    newest,
+  ]);
+  for (const [username, joined] of joinedAt) {
+    // Everyone has read everything, except alice, who stopped just before her last `aliceUnread` messages.
+    const unread = username === 'alice' ? script.aliceUnread : 0;
+    const lastRead = unread > 0 ? new Date(times.at(-unread - 1).getTime() + 1) : newest;
+    await db.query(
+      `UPDATE conversation_participants SET joined_at = $3, last_read_at = $4
+       WHERE conversation_id = $1 AND user_id = $2`,
+      [conversationId, user(username).userId, joined, lastRead],
+    );
+  }
+  return script.messages.length;
+}
+
+// Every notification the seeded actions would have created, built from the tables in one statement rather than one
+// call per like, so each matches its source row and time exactly. Same rules as the app: likes, reposts, replies (to
+// the direct parent's author), quotes and follows, never yourself. Returns { [type]: count }.
+async function seedNotifications(db) {
+  const { rows } = await db.query(
+    `INSERT INTO notifications (recipient_id, actor_id, type, post_id, created_at)
+     SELECT p.author_id, l.user_id, 'like', l.post_id, l.created_at
+     FROM likes l JOIN posts p ON p.post_id = l.post_id
+     WHERE l.user_id <> p.author_id
+     UNION ALL
+     SELECT p.author_id, r.user_id, 'repost', r.post_id, r.created_at
+     FROM reposts r JOIN posts p ON p.post_id = r.post_id
+     WHERE r.user_id <> p.author_id
+     UNION ALL
+     SELECT parent.author_id, p.author_id, 'reply', p.post_id, p.created_at
+     FROM posts p JOIN posts parent ON parent.post_id = p.parent_post_id
+     WHERE p.author_id <> parent.author_id
+     UNION ALL
+     SELECT quoted.author_id, p.author_id, 'quote', p.post_id, p.created_at
+     FROM posts p JOIN posts quoted ON quoted.post_id = p.quoted_post_id
+     WHERE p.author_id <> quoted.author_id
+     UNION ALL
+     SELECT f.followed_id, f.follower_id, 'follow', NULL, f.created_at
+     FROM follows f
+     RETURNING type`,
+  );
+  const counts = {};
+  for (const { type } of rows) counts[type] = (counts[type] ?? 0) + 1;
+  return counts;
+}
 
 async function seed(db) {
   await truncateAllTables(db);
@@ -199,16 +378,86 @@ async function seed(db) {
 
     const { postId } = await postsStore.createPost(fields, db);
     await db.query('UPDATE posts SET created_at = $2 WHERE post_id = $1', [postId, createdAt]);
-    posts.push({ postId, rootPostId: fields.rootPostId ?? null, authorId: author.userId });
+    posts.push({ postId, rootPostId: fields.rootPostId ?? null, authorId: author.userId, createdAt });
   }
 
-  // A few deleted posts, so threads and quotes show the deleted state.
+  // Engagement, each at a random time after the post. Not by the post's own author (allowed, but not realistic as
+  // seed data). alice's posts get a few extra likes, so her notifications fill up.
+  const usersByName = new Map(users.map((user) => [user.username, user]));
+  const alice = usersByName.get('alice');
+  const othersThan = (authorId) => users.filter((user) => user.userId !== authorId);
+  const engagement = { likes: 0, reposts: 0, bookmarks: 0 };
+
+  for (const post of posts) {
+    const likeCount = int(0, 6) + (post.authorId === alice.userId ? 3 : 0);
+    for (const liker of sample(othersThan(post.authorId), likeCount)) {
+      await engagementStore.addLike(liker.userId, post.postId, db);
+      await db.query('UPDATE likes SET created_at = $3 WHERE user_id = $1 AND post_id = $2', [
+        liker.userId,
+        post.postId,
+        randomTimeAfter(post.createdAt.getTime()),
+      ]);
+      engagement.likes += 1;
+    }
+
+    if (chance(0.12)) {
+      for (const reposter of sample(othersThan(post.authorId), int(1, 3))) {
+        await engagementStore.addRepost(reposter.userId, post.postId, db);
+        await db.query('UPDATE reposts SET created_at = $3 WHERE user_id = $1 AND post_id = $2', [
+          reposter.userId,
+          post.postId,
+          randomTimeAfter(post.createdAt.getTime()),
+        ]);
+        engagement.reposts += 1;
+      }
+    }
+  }
+
+  // Bookmarks: a dozen for alice (her bookmarks page), a few for everyone else.
+  for (const user of users) {
+    const count = user.userId === alice.userId ? 12 : int(0, 4);
+    for (const post of sample(
+      posts.filter((p) => p.authorId !== user.userId),
+      count,
+    )) {
+      await engagementStore.addBookmark(user.userId, post.postId, db);
+      await db.query('UPDATE bookmarks SET created_at = $3 WHERE user_id = $1 AND post_id = $2', [
+        user.userId,
+        post.postId,
+        randomTimeAfter(post.createdAt.getTime()),
+      ]);
+      engagement.bookmarks += 1;
+    }
+  }
+
+  // A few deleted posts, so threads and quotes show the deleted state. Their likes, reposts and notifications stay,
+  // hidden, as they would in the app.
   for (const post of sample(posts, Math.round(posts.length * 0.03))) {
     await postsStore.softDeletePost(post.postId, post.authorId, db);
     counts.deleted += 1;
   }
 
-  return { users: users.length, follows: followCount, ...counts };
+  // Conversations and messages.
+  let messageCount = 0;
+  for (const script of CONVERSATIONS) {
+    messageCount += await seedConversation(script, usersByName, now, db);
+  }
+
+  // Notifications last, built from everything above; alice has read the ones older than two days.
+  const notifications = await seedNotifications(db);
+  await notificationsStore.markReadUpTo(alice.userId, new Date(now - ALICE_NOTIFICATIONS_READ_AGO), db);
+  const aliceUnread = await notificationsStore.countUnread(alice.userId, db);
+
+  return {
+    users: users.length,
+    follows: followCount,
+    ...counts,
+    ...engagement,
+    conversations: CONVERSATIONS.length,
+    messages: messageCount,
+    notifications,
+    aliceUnread,
+  };
 }
 
 const dbName = new URL(config.databaseUrl).pathname.slice(1);
@@ -219,6 +468,12 @@ try {
   console.log(
     `  ${summary.originals} posts, ${summary.replies} replies, ${summary.quotes} quotes (${summary.deleted} deleted)`,
   );
+  console.log(`  ${summary.likes} likes, ${summary.reposts} reposts, ${summary.bookmarks} bookmarks`);
+  console.log(`  ${summary.conversations} conversations, ${summary.messages} messages`);
+  const byType = Object.entries(summary.notifications)
+    .map(([type, count]) => `${count} ${type}`)
+    .join(', ');
+  console.log(`  notifications: ${byType} (alice has ${summary.aliceUnread} unread)`);
   console.log(`Log in as any seeded user (e.g. alice) with password "${PASSWORD}".`);
 } finally {
   await pool.end();
